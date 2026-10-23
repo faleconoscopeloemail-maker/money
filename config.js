@@ -5,6 +5,6 @@
 // A chave anon é pública por natureza: a segurança vem das regras (RLS) do schema.sql.
 // NUNCA coloque aqui a chave "service_role" / "secret".
 window.MONEY_CONFIG = {
-  supabaseUrl: "COLE_AQUI_A_PROJECT_URL",
-  supabaseAnonKey: "COLE_AQUI_A_ANON_KEY"
+  supabaseUrl: "https://xzufpqredqytyxinqimr.supabase.co",
+  supabaseAnonKey: "sb_publishable_uL1ZCwJ24hOSXFyrHNuxhg__AmVQlCo"
 };
