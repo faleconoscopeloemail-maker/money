@@ -214,7 +214,7 @@ tfoot td{font-weight:700;background:var(--surface-2)}
 .f .hint{font-size:11.5px;color:var(--muted)}
 .seg{display:inline-flex;flex-wrap:wrap;gap:3px;border-radius:12px;background:var(--surface-2);padding:3px;align-self:flex-start;max-width:100%}
 .seg label{padding:7px 13px;cursor:pointer;font-size:13px;display:flex;gap:6px;align-items:center;border-radius:9px;font-weight:500;color:var(--muted)}
-.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg input{position:absolute;opacity:0;pointer-events:none;width:1px!important;height:1px;margin:0}
 .seg label:has(input:checked){background:var(--surface);color:var(--mc,var(--accent));font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .seg label:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:-2px}
 .preview{background:color-mix(in srgb,var(--mc,var(--accent)) 7%,var(--surface));border:1px solid color-mix(in srgb,var(--mc,var(--accent)) 25%,var(--line));border-radius:14px;padding:14px 16px}
@@ -710,6 +710,7 @@ function renderSide(){
       <button class="nav ${ui.view===k?"on":""}" data-act="view" data-v="${k}" style="--mc:var(${c})"><span class="ico">${icon(k)}</span>${l}${PROTEGIDAS.has(k)&&pinAtivo()&&!(ui.sec&&ui.view===k)?`<span class="lk-i" title="Protegido por senha">${icon("lock")}</span>`:""}${counts[k]?`<span class="cnt" title="vencidos">${counts[k]}</span>`:""}</button>`).join("")}</div>`).join("")}
     <div class="sidefoot">
       <div class="sync cloud"><i></i>Sincronizado${sessao?.user?.email?` · ${esc(sessao.user.email)}`:""}</div>
+      <a class="btn sm ghost" href="manual.pdf" target="_blank" rel="noopener" style="text-decoration:none">📘 Manual de uso</a>
       <button class="btn sm ghost" data-act="backup-json">Baixar backup (JSON)</button>
       <button class="btn sm ghost" data-act="backup-csv">Exportar lançamentos (CSV)</button>
       <button class="btn sm ghost" data-act="import">Restaurar backup</button>
@@ -828,7 +829,7 @@ function viewLista(nat){
   const origensUsadas = [...new Set(base.map(e=>e.origem))];
   const verbo = isP?"Pago":"Recebido";
   return `
-  <div class="head"><div><h2><span class="sw">${icon(ui.view)}</span>Contas a ${nat}</h2><p class="sub">Lançamentos avulsos ${isP?"+ compras no cartão e parcelas de financiamentos, empréstimos e aquisições":"+ parcelas de devedores"}</p></div>
+  <div class="head"><div><h2><span class="sw">${icon(ui.view)}</span>Contas a ${nat}</h2><p class="sub">Lançamentos avulsos ${isP?"+ compras no cartão e parcelas de financiamentos e empréstimos":"+ parcelas de devedores"}</p></div>
     <div class="row">${ui.todos?"":monthNav()}${pdfBtn()}<button class="btn pri" data-act="novo-lanc" data-nat="${nat}">+ Nova conta a ${nat}</button></div></div>
   <div class="kpis">
     <div class="kpi" style="--kc:var(--mc)"><span class="l">Total ${ui.todos?"(todos os meses)":perDe()}</span><span class="v">${money(tot)}</span><span class="d">${L.length} lançamento(s)</span></div>
@@ -1646,7 +1647,7 @@ async function sair(){ try{ await sb.auth.signOut(); }catch(e){} sairLimpo(); }
 /* --- Telas de entrada --- */
 function lockHtml(){
   const head = `<div class="lk-logo"><img src="${LOGO_FULL}" alt="Money – Finanças pessoais"></div>`;
-  const foot = `<p class="lk-foot"><a href="privacidade.html" target="_blank" rel="noopener">Privacidade</a> · <a href="termos.html" target="_blank" rel="noopener">Termos de uso</a></p>`;
+  const foot = `<p class="lk-foot"><a href="manual.pdf" target="_blank" rel="noopener">Manual de uso</a> · <a href="privacidade.html" target="_blank" rel="noopener">Privacidade</a> · <a href="termos.html" target="_blank" rel="noopener">Termos de uso</a></p>`;
   const k = !storeReady ? "carregando" : ui.lk;
   const err = `<p class="lk-err" id="lkerr"></p>`;
   if(k==="config") return {k,h:`${head}<div class="lk-card"><h2>Falta configurar</h2><p class="note">Abra o arquivo <b>config.js</b> e cole a URL e a chave pública (anon key) do seu projeto Supabase. Veja o Passo 3 do guia.</p></div>`};
@@ -1739,7 +1740,7 @@ function goView(v, after){
 }
 function viewCadastro(){
   const p=perfil()||{}; const email=sessao?.user?.email||p.email||"";
-  return `<div class="head"><div><h2><span class="sw">${icon("cadastro")}</span>Meu cadastro</h2><p class="sub">Seus dados, senhas e privacidade</p></div><div class="row"><button class="btn" data-act="lk-sair">Bloquear</button><button class="btn" data-act="lk-sair-conta">Sair da conta</button></div></div>
+  return `<div class="head"><div><h2><span class="sw">${icon("cadastro")}</span>Meu cadastro</h2><p class="sub">Seus dados, senhas e privacidade</p></div><div class="row"><a class="btn" href="manual.pdf" target="_blank" rel="noopener" style="text-decoration:none">📘 Manual de uso</a>${pinAtivo()?`<button class="btn" data-act="lk-sair">Bloquear</button>`:""}<button class="btn" data-act="lk-sair-conta">Sair da conta</button></div></div>
   <div class="grid2">
     <form class="panel cadform" id="cadform" novalidate><h3>Dados pessoais</h3>
       <div class="fg">${fld("pf_nome","Nome completo",inp("pf_nome",p.nome))}${fld("pf_email","E-mail (login)",inp("pf_email",email,'type="email" readonly'))}</div>
@@ -1755,7 +1756,7 @@ function viewCadastro(){
       <p class="lk-err" id="pserr"></p><div><button class="btn pri" type="submit" style="--mc:var(--accent)">${p.pinHash?"Alterar":"Criar"} senha rápida</button></div></form>
     <div class="panel cadform"><h3>Privacidade</h3><p class="note" style="margin:-6px 0 4px">Seus dados são seus. Você pode baixar uma cópia ou apagar tudo.</p>
       <div class="row"><button class="btn" data-act="backup-json">Baixar meus dados (JSON)</button><button class="btn danger" data-act="conta-excluir">Excluir minha conta</button></div>
-      <p class="note" style="margin:0"><a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a> · <a href="termos.html" target="_blank" rel="noopener">Termos de uso</a></p></div>
+      <p class="note" style="margin:0"><a href="manual.pdf" target="_blank" rel="noopener">Manual de uso (PDF)</a> · <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a> · <a href="termos.html" target="_blank" rel="noopener">Termos de uso</a></p></div>
   </div>`;
 }
 async function cadSubmit(form){
