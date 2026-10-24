@@ -411,6 +411,9 @@ tfoot td{font-weight:700;background:var(--surface-2)}
 .lk-btn{justify-content:center;padding:12px;font-size:15px;--mc:var(--accent)}
 .lk-err{margin:0;min-height:18px;color:var(--bad);font-size:13px;font-weight:600}
 input.pin{-webkit-text-security:disc;text-security:disc;letter-spacing:.6em;font-size:22px;text-align:center;font-weight:800;padding:10px 12px!important;font-variant-numeric:tabular-nums}
+.legal{margin-top:auto;padding:14px 16px;border-top:1px solid var(--line);font-size:11.5px;line-height:1.55;color:var(--muted);user-select:none;-webkit-user-select:none}
+.legal b{color:var(--fg);font-weight:700}.legal a{color:var(--muted);text-decoration:underline}
+@media print{.legal{display:block}}
 .nav .lk-i{margin-left:auto;opacity:.55;display:inline-flex}
 .nav .lk-i svg{width:13px;height:13px}
 .nav .lk-i + .cnt{margin-left:6px}
@@ -727,6 +730,7 @@ function renderSide(){
     </div>`;
 }
 
+const AVISO_LEGAL = `<footer class="legal" role="contentinfo"><b>© 2026 Yoshizane Gestão e Consultoria Ltda. · Todos os direitos reservados.</b> O Money — marca, logotipo, código, telas, textos, funcionalidades e manual — é protegido pela Lei 9.610/1998 (direitos autorais) e pela Lei 9.609/1998 (software). É proibido copiar, reproduzir, divulgar, fazer engenharia reversa ou usar este conteúdo, inclusive por inteligência artificial, para treinar modelos ou criar sistema igual ou semelhante, sem autorização por escrito. <a href="aviso-legal.html" target="_blank" rel="noopener">Aviso legal</a> · <a href="termos.html" target="_blank" rel="noopener">Termos de uso</a> · <a href="privacidade.html" target="_blank" rel="noopener">Privacidade</a></footer>`;
 function render(){
   if (!ui.auth){ renderLock(); $("#side").innerHTML=""; $("#main").innerHTML=""; return; }
   aplicarProgramados();
@@ -737,6 +741,7 @@ function render(){
   main.style.setProperty("--mc",`var(${viewColor(ui.view)})`);
   const v = ui.view;
   main.innerHTML = v==="painel"?viewPainel(): v==="pagar"||v==="receber"?viewLista(v): v==="cartao"?viewCartao(): MODS[v]?viewContratos(v): v==="invest"?viewInvest(): v==="categorias"?viewCategorias(): v==="fluxo"?viewFluxo(): v==="cadastro"?viewCadastro(): viewPainel();
+  main.insertAdjacentHTML("beforeend", AVISO_LEGAL);
   if (fid){ const el=document.getElementById(fid); if(el){ el.focus(); if(sel&&el.setSelectionRange) try{el.setSelectionRange(sel[0],sel[1]);}catch(e){} } }
 }
 
@@ -1655,7 +1660,7 @@ async function sair(){ try{ await sb.auth.signOut(); }catch(e){} sairLimpo(); }
 /* --- Telas de entrada --- */
 function lockHtml(){
   const head = `<div class="lk-logo"><img src="${LOGO_FULL}" alt="Money – Finanças pessoais"></div>`;
-  const foot = `<p class="lk-foot"><a href="manual.pdf" target="_blank" rel="noopener">Manual de uso</a> · <a href="privacidade.html" target="_blank" rel="noopener">Privacidade</a> · <a href="termos.html" target="_blank" rel="noopener">Termos de uso</a><br><span style="opacity:.75">© 2026 Yoshizane Gestão e Consultoria Ltda. Todos os direitos reservados. Proibida a cópia, reprodução ou uso por inteligência artificial para recriar a plataforma.</span></p>`;
+  const foot = `<p class="lk-foot"><a href="manual.pdf" target="_blank" rel="noopener">Manual de uso</a> · <a href="aviso-legal.html" target="_blank" rel="noopener">Aviso legal</a> · <a href="privacidade.html" target="_blank" rel="noopener">Privacidade</a> · <a href="termos.html" target="_blank" rel="noopener">Termos de uso</a><br><span style="opacity:.75">© 2026 Yoshizane Gestão e Consultoria Ltda. Todos os direitos reservados. Proibida a cópia, reprodução ou uso por inteligência artificial para recriar a plataforma.</span></p>`;
   const k = !storeReady ? "carregando" : ui.lk;
   const err = `<p class="lk-err" id="lkerr"></p>`;
   if(k==="config") return {k,h:`${head}<div class="lk-card"><h2>Falta configurar</h2><p class="note">Abra o arquivo <b>config.js</b> e cole a URL e a chave pública (anon key) do seu projeto Supabase. Veja o Passo 3 do guia.</p></div>`};
