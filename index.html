@@ -411,6 +411,7 @@ tfoot td{font-weight:700;background:var(--surface-2)}
 .lk-btn{justify-content:center;padding:12px;font-size:15px;--mc:var(--accent)}
 .lk-err{margin:0;min-height:18px;color:var(--bad);font-size:13px;font-weight:600}
 input.pin{-webkit-text-security:disc;text-security:disc;letter-spacing:.6em;font-size:22px;text-align:center;font-weight:800;padding:10px 12px!important;font-variant-numeric:tabular-nums}
+.cadform .chk{display:flex;align-items:flex-start;gap:8px;color:var(--fg);font-size:13.5px;margin:4px 0}.cadform .chk input{width:16px!important;height:16px;flex:none;margin-top:2px;padding:0}
 .legal{margin-top:auto;padding:14px 16px;border-top:1px solid var(--line);font-size:11.5px;line-height:1.55;color:var(--muted);user-select:none;-webkit-user-select:none}
 .legal b{color:var(--fg);font-weight:700}.legal a{color:var(--muted);text-decoration:underline}
 @media print{.legal{display:block}}
@@ -654,7 +655,7 @@ function allEntries(opt={}){
         if(!f){ f={key:fk,id:k,origem:"cartao",natureza:"pagar",descricao:"Fatura "+cardNameOf(r),detalhe:"",categoria:"Cartão de crédito",classe:"variavel",valor:0,venc:r.vencimento,pago:true,dataPag:null,n:0}; fat.set(fk,f); }
         f.valor=r2(f.valor+r.valor); f.n++; if(r.vencimento<f.venc) f.venc=r.vencimento; if(!r.pago) f.pago=false; else if(!f.dataPag||(r.dataPagamento||"")>f.dataPag) f.dataPag=r.dataPagamento||r.vencimento; continue; }
       out.push({key:"l:"+r.id, id:r.id, origem:card?"cartao":"conta", natureza:r.natureza, descricao:card?`${r.descricao}`:r.descricao,
-        detalhe: (card ? `${cardNameOf(r)} · ${condTxt(r)}` : (r.totalParcelas>1?`${condTxt(r)} · ${r.forma||""}`:(r.forma||"")))+(r.editado?" · alterado neste mês":""),
+        detalhe: (r.parte?r.parte+" · ":"")+(card ? `${cardNameOf(r)} · ${condTxt(r)}` : (r.totalParcelas>1?`${condTxt(r)} · ${r.forma||""}`:(r.forma||"")))+(r.editado?" · alterado neste mês":""),
         categoria:r.categoria||"Outros", classe:r.classe||"variavel", valor:r.valor, venc:r.vencimento, pago:!!r.pago, dataPag:r.dataPagamento, editavel:true, card});
     } else if (r.tipo==="contrato"){
       const M = MODS[r.modalidade]; if(!M) continue; const fora = r.modalidade==="aquisicao" || !!r.semFluxo; if(fora && !opt.todos) continue; /* aquisições e contratos desmarcados ficam só na aba deles */
@@ -1500,7 +1501,8 @@ function formLanc(nat, id){
     body: `${r?escopoBlock(r):""}
     <div class="f"><span class="lb">Tipo</span>${seg("classe",[["fixa",nat==="pagar"?"Despesa fixa":"Receita fixa"],["variavel",nat==="pagar"?"Despesa variável":"Receita variável"]], r?.classe||"variavel")}</div>
     <div class="fg">${fld("descricao","Descrição",inp("descricao",r?.descricao,`placeholder="${nat==="pagar"?"Ex.: Aluguel, conta de luz":"Ex.: Salário, recebível Minimart"}" autocomplete="off"`))}
-      ${fld("categoria","Categoria",catSelect("categoria",nat,r?.categoria||catList(nat)[0]?.nome))}</div>
+      ${fld("parte",nat==="pagar"?"Fornecedor (opcional)":"Cliente (opcional)",inp("parte",r?.parte,`placeholder="${nat==="pagar"?"Ex.: Enel, Imobiliária X":"Ex.: Cliente Lima"}" autocomplete="off"`))}</div>
+    <div class="fg">${fld("categoria","Categoria",catSelect("categoria",nat,r?.categoria||catList(nat)[0]?.nome))}</div>
     ${r?(r.grupo&&r.totalParcelas>1)?"":`<p class="note condinfo">${esc(r.cond==="recorrente"?`Recorrente (${freqNome(r.freq).toLowerCase()}) · ${r.parcela} de ${r.totalParcelas}`:r.totalParcelas>1?`Parcela ${r.parcela} de ${r.totalParcelas}`:"À vista")}</p>`:condBlock("",{})}
     <div class="fg">${fld("valor",r?"Valor (R$)":"Valor (R$)",moneyInp("valor",r?.valor))}${fld("vencimento",nat==="pagar"?(r?"Vencimento":"Vencimento (1º)"):(r?"Data prevista":"Data prevista (1ª)"),inp("vencimento",r?.vencimento||todayStr(),'type="date"'))}
       ${fld("forma","Forma",selInp("forma",r&&r.forma&&!FORMAS.includes(r.forma)?[r.forma,...formas]:formas,r?.forma||"Pix"))}</div>
@@ -1514,7 +1516,7 @@ function formLanc(nat, id){
       if(!req(fd,[["descricao","descrição"],["valor","valor"],["vencimento","vencimento"]])) return;
       const valor = r2(parseMoney(fd.get("valor"))); if(!(valor>0)){toast("Informe um valor maior que zero.");return;}
       const categoria = catValue(fd,"categoria",nat); if(categoria===null) return;
-      const base = {descricao:fd.get("descricao").trim(), categoria, forma:fd.get("forma"), classe:fd.get("classe")||"variavel", obs:fd.get("obs")||""};
+      const base = {descricao:fd.get("descricao").trim(), parte:String(fd.get("parte")||"").trim(), categoria, forma:fd.get("forma"), classe:fd.get("classe")||"variavel", obs:fd.get("obs")||""};
       if (r){
         const editado = r.editado || Math.abs(valor-r.valor)>0.004 || fd.get("vencimento")!==r.vencimento;
         Object.assign(r, base, {valor, vencimento:fd.get("vencimento"), pago:!!fd.get("pago"), editado: fd.get("escopo")==="proximos"?r.editado:editado}); r.dataPagamento = r.pago ? (r.dataPagamento||todayStr()) : null;
@@ -1654,7 +1656,7 @@ async function garantirPerfil(user){
     await saveRec({id:PERFIL_ID,tipo:"config",nome:md.nome||"",email:user.email,telefone:md.telefone||"",cpf:md.cpf||"",salt:salt||"",pinHash:pinHash||"",criado:new Date().toISOString()}); }
   else if(p.email!==user.email){ const y=clone(p); y.email=user.email; saveRec(y); }
 }
-function sairLimpo(){ if(canal&&sb) sb.removeChannel(canal); canal=null; sessao=null; uidAtual=null; recs=new Map(); queues.clear(); ui.auth=false; ui.sec=false; ui.lk="login"; lockState=""; clearTimeout(idleT); closeModal(); render(); }
+function sairLimpo(){ tgSt=null; tgCod=null; if(canal&&sb) sb.removeChannel(canal); canal=null; sessao=null; uidAtual=null; recs=new Map(); queues.clear(); ui.auth=false; ui.sec=false; ui.lk="login"; lockState=""; clearTimeout(idleT); closeModal(); render(); }
 async function sair(){ try{ await sb.auth.signOut(); }catch(e){} sairLimpo(); }
 
 /* --- Telas de entrada --- */
@@ -1751,6 +1753,27 @@ function goView(v, after){
   if (PROTEGIDAS.has(v)){ if(!pinAtivo() || (ui.sec && ui.view===v)) { ui.sec=true; return ir(); } return pedirPin(v==="invest"?"Patrimônio · Investimentos":"Compromissos · "+MODS[v].label, ()=>{ ui.sec=true; ir(); }); }
   ui.sec=false; ir();
 }
+/* ---------- Telegram · CFO digital ---------- */
+let tgSt = null, tgCod = null, tgBusy = false;
+async function tgCarregar(force){ if(tgBusy || (tgSt && !force) || !sb) return; tgBusy=true;
+  try{ const {data,error}=await sb.rpc("telegram_status"); tgSt = (error||!data) ? {liberado:false} : data; }catch(e){ tgSt={liberado:false}; }
+  tgBusy=false; if(ui.view==="cadastro") render(); }
+function tgCard(){
+  if(!tgSt){ tgCarregar(); return ""; }
+  if(!tgSt.liberado) return "";
+  const bot=(window.MONEY_CONFIG||{}).telegramBot||""; const pf=tgSt.prefs||{};
+  const chk=(k,l)=>`<label class="chk" style="padding:0"><input type="checkbox" class="tgpref" data-k="${k}" ${pf[k]!==false?"checked":""}> ${l}</label>`;
+  return `<div class="panel cadform" style="--mc:#229ED9"><h3>📱 Telegram · Assistente</h3>
+    <p class="note" style="margin:-6px 0 10px">Lance contas por mensagem, dê baixa em pagamentos, veja relatórios do mês e dos investimentos e receba alertas de vencimentos. Tudo fica entre o Money e o seu Telegram.</p>
+    ${tgSt.vinculado?`<p style="margin:0 0 10px"><b style="color:var(--ok)">✅ Conectado</b>${bot?` ao <a href="https://t.me/${esc(bot)}" target="_blank" rel="noopener">@${esc(bot)}</a>`:""}</p>
+      <div class="f"><span class="lb">Mensagens automáticas</span>${chk("diario","Alertas diários às 8h (vencimentos, faturas, atrasos)")}${chk("semanal","Resumo semanal às segundas")}${chk("mensal","Análise de fechamento no dia 1")}</div>
+      <div class="row" style="margin-top:10px"><button class="btn danger" data-act="tg-desc">Desconectar</button></div>`
+    : tgCod?`<p style="margin:0 0 6px">Seu código (vale 15 minutos):</p><div style="font-size:30px;font-weight:800;letter-spacing:.25em;margin:0 0 10px">${tgCod}</div>
+      ${bot?`<div class="row"><a class="btn pri" style="--mc:#229ED9;text-decoration:none" href="https://t.me/${esc(bot)}?start=${tgCod}" target="_blank" rel="noopener">Abrir no Telegram</a><button class="btn" data-act="tg-atualizar">Já conectei</button></div>
+      <p class="note" style="margin:8px 0 0">Ou envie para <b>@${esc(bot)}</b> a mensagem <b>/vincular ${tgCod}</b>.</p>`:`<p class="note">Envie ao seu bot a mensagem <b>/vincular ${tgCod}</b>.</p><div class="row"><button class="btn" data-act="tg-atualizar">Já conectei</button></div>`}`
+    :`<div class="row"><button class="btn pri" style="--mc:#229ED9" data-act="tg-gerar">Conectar Telegram</button></div>`}
+  </div>`;
+}
 function viewCadastro(){
   const p=perfil()||{}; const email=sessao?.user?.email||p.email||"";
   return `<div class="head"><div><h2><span class="sw">${icon("cadastro")}</span>Meu cadastro</h2><p class="sub">Seus dados, senhas e privacidade</p></div><div class="row"><a class="btn" href="manual.pdf" target="_blank" rel="noopener" style="text-decoration:none">📘 Manual de uso</a>${pinAtivo()?`<button class="btn" data-act="lk-sair">Bloquear</button>`:""}<button class="btn" data-act="lk-sair-conta">Sair da conta</button></div></div>
@@ -1767,6 +1790,7 @@ function viewCadastro(){
       <p class="note" style="margin:-4px 0 12px">${pinAtivo()?"A senha rápida é pedida para abrir Compromissos e Patrimônio e para desbloquear após 15 min sem uso.":p.pinHash?"Acesso livre: nada pede a senha rápida. Para voltar a pedir, marque “Pedir senha rápida” (sua senha atual continua guardada).":"Acesso livre. Para proteger Compromissos e Patrimônio, crie uma senha rápida abaixo."}</p>
       <div class="fg">${p.pinHash?fld("ps_atual","Senha rápida atual",pinInp("ps_atual")):""}${fld("ps_nova","Nova",pinInp("ps_nova"))}${fld("ps_nova2","Confirme",pinInp("ps_nova2"))}</div>
       <p class="lk-err" id="pserr"></p><div><button class="btn pri" type="submit" style="--mc:var(--accent)">${p.pinHash?"Alterar":"Criar"} senha rápida</button></div></form>
+    ${tgCard()}
     <div class="panel cadform"><h3>Privacidade</h3><p class="note" style="margin:-6px 0 4px">Seus dados são seus. Você pode baixar uma cópia ou apagar tudo.</p>
       <div class="row"><button class="btn" data-act="backup-json">Baixar meus dados (JSON)</button><button class="btn danger" data-act="conta-excluir">Excluir minha conta</button></div>
       <p class="note" style="margin:0"><a href="manual.pdf" target="_blank" rel="noopener">Manual de uso (PDF)</a> · <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a> · <a href="termos.html" target="_blank" rel="noopener">Termos de uso</a></p><p class="note" style="margin:6px 0 0">© 2026 Yoshizane Gestão e Consultoria Ltda. Todos os direitos reservados. O Money, seu código, telas e manual são protegidos por direitos autorais; é proibido copiá-los, divulgá-los ou usá-los, inclusive por inteligência artificial, para criar sistema igual ou semelhante.</p></div>
@@ -2218,6 +2242,9 @@ document.addEventListener("click", ev=>{
     case "pin-esqueci": closeModal(); formNovoPin(); break;
     case "pin-esqueci-lock": formNovoPin(()=>unlockApp()); break;
     case "conta-excluir": formExcluirConta(); break;
+    case "tg-gerar": (async()=>{ const {data,error}=await sb.rpc("telegram_gerar_codigo"); if(error){ toast("Não foi possível gerar o código."); return; } tgCod=data; render(); })(); break;
+    case "tg-atualizar": tgCod=null; tgCarregar(true); break;
+    case "tg-desc": ask("Desconectar Telegram","O bot deixa de responder e de mandar alertas. Você pode conectar de novo quando quiser.",[{label:"Desconectar",cls:"danger",fn:async()=>{ await sb.rpc("telegram_desconectar"); tgCod=null; await tgCarregar(true); toast("Telegram desconectado."); }}]); break;
     case "mes": ui.mes=shiftMonth(ui.mes,+b.dataset.d*(ui.per==="ano"?12:1)); render(); break;
     case "per": ui.per=b.dataset.p; render(); break;
     case "pdf": gerarPDF(); break;
@@ -2286,6 +2313,7 @@ document.addEventListener("input", ev=>{
   if (ev.target.closest("#mform") && modalInput) modalInput(new FormData($("#mform")));
 });
 document.addEventListener("change", ev=>{
+  if (ev.target.classList && ev.target.classList.contains("tgpref")){ const p={...(tgSt?.prefs||{})}; p[ev.target.dataset.k]=ev.target.checked; tgSt.prefs=p; sb.rpc("telegram_prefs",{p}).then(({error})=>toast(error?"Não foi possível salvar.":"Preferência salva.")); return; }
   if (ev.target.name==="pin_modo" && ev.target.closest("#pinform")){ const modo=ev.target.value; const p=clone(perfil()||{id:PERFIL_ID,tipo:"config"});
     if(modo==="livre"){ if(!pinAtivo()) return; pedirPin("Liberar acesso sem senha rápida", ()=>{ p.pinLivre=true; saveRec(p); ui.sec=false; clearTimeout(idleT); toast("Pronto: Compromissos e Patrimônio abrem sem senha rápida."); render(); }); return; }
     if(!p.pinHash){ toast("Crie a senha rápida nos campos abaixo para ativar."); setTimeout(()=>$("#ps_nova")?.focus(),50); render(); return; }
