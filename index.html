@@ -412,6 +412,7 @@ tfoot td{font-weight:700;background:var(--surface-2)}
 .lk-err{margin:0;min-height:18px;color:var(--bad);font-size:13px;font-weight:600}
 input.pin{-webkit-text-security:disc;text-security:disc;letter-spacing:.6em;font-size:22px;text-align:center;font-weight:800;padding:10px 12px!important;font-variant-numeric:tabular-nums}
 .cadform .chk{display:flex;align-items:flex-start;gap:8px;color:var(--fg);font-size:13.5px;margin:4px 0}.cadform .chk input{width:16px!important;height:16px;flex:none;margin-top:2px;padding:0}
+.thsort{border:0;background:none;padding:0;font:inherit;color:inherit;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:4px;white-space:nowrap}.thsort span{font-size:9px;opacity:.45}.thsort.on{color:var(--fg)}.thsort.on span{opacity:1;color:var(--mc,var(--accent))}.thsort:hover{color:var(--fg)}th.r .thsort{flex-direction:row}
 .legal{margin-top:auto;padding:14px 16px;border-top:1px solid var(--line);font-size:11.5px;line-height:1.55;color:var(--muted);user-select:none;-webkit-user-select:none}
 .legal b{color:var(--fg);font-weight:700}.legal a{color:var(--muted);text-decoration:underline}
 @media print{.legal{display:block}}
@@ -681,6 +682,7 @@ function togglePago(key){
 
 /* ============ Estado de tela ============ */
 const ui = { view:"painel", mes: todayStr().slice(0,7), todos:false, status:"todos", origem:"todas", busca:"", per:"mes", dash:new Set(), lk:"login", lkEmail:"", auth:false, sec:false, open:new Set(), fxIni: shiftMonth(todayStr().slice(0,7),-2), fxN:12, fxModo:"previsto" };
+try{ const o=JSON.parse(localStorage.getItem(LSKEY+":ord")||"null"); if(o&&o.k) ui.ord=o; }catch(e){}
 try{ const v=localStorage.getItem(LSKEY+":view"); if(v && !PROTEGIDAS.has(v)) ui.view=v; }catch(e){}
 let renderPending=false;
 function scheduleRender(){ if(renderPending) return; renderPending=true; requestAnimationFrame(()=>{renderPending=false;render();}); }
@@ -697,27 +699,31 @@ const ICON_PATHS = {
   invest:'<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>',
   fluxo:'<path d="M3 12h3.5l2.5-6 4 12 2.5-6H21"/>',
   cadastro:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  usuarios:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.6"/><path d="M16 14.2a5 5 0 0 1 6 4.8"/>',
   lock:'<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
   categorias:'<path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7l8.3 8.3a1.5 1.5 0 0 1 0 2.1l-6.1 6.1a1.5 1.5 0 0 1-2.1 0z"/><circle cx="8.3" cy="8.3" r="1.6"/>',
 };
 const icon = k => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${ICON_PATHS[k]||""}</svg>`;
 const VIEWS = [
   {g:"Visão geral", items:[["painel","Painel","--c-painel"]]},
-  {g:"Fluxo de caixa", items:[["receber","Contas a receber","--c-receber"],["pagar","Contas a pagar","--c-pagar"],["cartao","Cartão de crédito","--c-cartao"],["fluxo","Fluxo de caixa","--c-fluxo"]]},
+  {g:"Fluxo de caixa", items:[["receber","Contas a receber","--c-receber"],["pagar","Contas a pagar","--c-pagar"],["fluxo","Fluxo de caixa","--c-fluxo"],["cartao","Cartão de crédito","--c-cartao"]]},
   {g:"Compromissos", items:[["financiamento","Financiamentos","--c-financiamento"],["emprestimo","Empréstimos","--c-emprestimo"],["aquisicao","Aquisições","--c-aquisicao"],["devedor","Devedores","--c-devedor"]]},
   {g:"Patrimônio", items:[["invest","Investimentos","--c-invest"]]},
   {g:"Ajustes", items:[["categorias","Categorias","--c-conta"],["cadastro","Meu cadastro","--c-conta"]]},
 ];
 const viewColor = v => (VIEWS.flatMap(g=>g.items).find(i=>i[0]===v)||[,, "--accent"])[2];
 
+let souAdmin = null, adminLista = null, adminBusca = "";
+async function adminCheck(){ if(souAdmin!==null || !sb || !sessao) return; souAdmin=false; try{ const {data,error}=await sb.rpc("sou_admin"); souAdmin = !error && data===true; }catch(e){ souAdmin=false; } if(souAdmin) render(); }
 function renderSide(){
+  adminCheck();
   const E = allEntries({todos:true}); const t=todayStr();
   const venc = o => E.filter(e=>!e.pago&&e.venc<t&&(o(e))).length;
   const counts = {pagar:venc(e=>e.natureza==="pagar"&&!e.fora), receber:venc(e=>e.natureza==="receber"&&!e.fora), cartao:venc(e=>e.origem==="cartao"),
     financiamento:venc(e=>e.origem==="financiamento"), emprestimo:venc(e=>e.origem==="emprestimo"), aquisicao:venc(e=>e.origem==="aquisicao"), devedor:venc(e=>e.origem==="devedor")};
   $("#side").innerHTML = `
     <div class="brand"><h1 class="sr">Money · Finanças pessoais</h1><img class="lf" alt="Money – Finanças pessoais" src="${LOGO_FULL}"><img class="lm" alt="Money" src="${LOGO_MARK}"></div>
-    ${VIEWS.map(g=>`<div class="navgroup"><div class="navlabel">${g.g}</div>${g.items.map(([k,l,c])=>`
+    ${VIEWS.map(g=>`<div class="navgroup"><div class="navlabel">${g.g}</div>${(g.g==="Ajustes"&&souAdmin?[...g.items,["usuarios","Usuários","--accent"]]:g.items).map(([k,l,c])=>`
       <button class="nav ${ui.view===k?"on":""}" data-act="view" data-v="${k}" style="--mc:var(${c})"><span class="ico">${icon(k)}</span>${l}${PROTEGIDAS.has(k)&&pinAtivo()&&!(ui.sec&&ui.view===k)?`<span class="lk-i" title="Protegido por senha">${icon("lock")}</span>`:""}${counts[k]?`<span class="cnt" title="vencidos">${counts[k]}</span>`:""}</button>`).join("")}</div>`).join("")}
     <div class="sidefoot">
       <div class="sync cloud"><i></i>Sincronizado${sessao?.user?.email?` · ${esc(sessao.user.email)}`:""}</div>
@@ -741,7 +747,7 @@ function render(){
   const main = $("#main");
   main.style.setProperty("--mc",`var(${viewColor(ui.view)})`);
   const v = ui.view;
-  main.innerHTML = v==="painel"?viewPainel(): v==="pagar"||v==="receber"?viewLista(v): v==="cartao"?viewCartao(): MODS[v]?viewContratos(v): v==="invest"?viewInvest(): v==="categorias"?viewCategorias(): v==="fluxo"?viewFluxo(): v==="cadastro"?viewCadastro(): viewPainel();
+  main.innerHTML = v==="painel"?viewPainel(): v==="pagar"||v==="receber"?viewLista(v): v==="cartao"?viewCartao(): MODS[v]?viewContratos(v): v==="invest"?viewInvest(): v==="categorias"?viewCategorias(): v==="fluxo"?viewFluxo(): v==="cadastro"?viewCadastro(): v==="usuarios"?viewUsuarios(): viewPainel();
   main.insertAdjacentHTML("beforeend", AVISO_LEGAL);
   if (fid){ const el=document.getElementById(fid); if(el){ el.focus(); if(sel&&el.setSelectionRange) try{el.setSelectionRange(sel[0],sel[1]);}catch(e){} } }
 }
@@ -865,7 +871,11 @@ function viewLista(nat){
 }
 function tabelaEntries(L,nat){
   if (!L.length) return `<div class="tw"><div class="empty"><b>Nenhum lançamento aqui</b>${ui.todos?"":"Troque o mês, marque “Todos os meses” ou "}clique em “+ Nova conta a ${nat}”.</div></div>`;
-  return `<div class="tw"><table><thead><tr><th>Status</th><th>Vencimento</th><th>Descrição</th><th>Origem</th><th>Categoria</th><th>Tipo</th><th class="r">Valor</th><th class="r">Ações</th></tr></thead><tbody>
+  const o = ui.ord || {k:"venc",d:1}; const ST={vencido:0,proximo:1,aberto:2,pago:3};
+  const val = e => o.k==="status"?ST[status(e)[0]]:o.k==="valor"?e.valor:o.k==="venc"?e.venc:o.k==="origem"?(ORIGENS[e.origem]||""):o.k==="classe"?(e.classe||""):String(e[o.k]||"").toLowerCase();
+  L = L.slice().sort((a,b)=>{ const x=val(a), y=val(b); const c = typeof x==="number"&&typeof y==="number" ? x-y : String(x).localeCompare(String(y),"pt-BR",{numeric:true}); return (c||a.venc.localeCompare(b.venc))*o.d; });
+  const th = (k,l,cls="") => `<th class="${cls}" aria-sort="${o.k===k?(o.d>0?"ascending":"descending"):"none"}"><button class="thsort ${o.k===k?"on":""}" data-act="ord" data-k="${k}" title="Ordenar por ${l.toLowerCase()}">${l}<span>${o.k===k?(o.d>0?"▲":"▼"):"↕"}</span></button></th>`;
+  return `<div class="tw"><table><thead><tr>${th("status","Status")}${th("venc","Vencimento")}${th("descricao","Descrição")}${th("origem","Origem")}${th("categoria","Categoria")}${th("classe","Tipo")}${th("valor","Valor","r")}<th class="r">Ações</th></tr></thead><tbody>
   ${L.map(e=>`<tr class="${e.pago?"is-pago":""}">
     <td>${pill(e)}</td><td class="num">${dt(e.venc)}</td>
     <td class="desc">${esc(e.descricao)}${e.detalhe?`<small>${esc(e.detalhe)}</small>`:""}</td>
@@ -1231,7 +1241,7 @@ function fluxoDados(ini,n,modo){
   const rows = months.map((m,i)=>{ const res=r2(tot[i].ent-tot[i].sai); const inicio=r2(acc); acc=r2(acc+res); return {m,ent:r2(tot[i].ent),sai:r2(tot[i].sai),res,inicio,fim:acc}; });
   return {months,cats,rows,saldoIni};
 }
-function fluxoChart(rows){
+function fluxoChart(rows, lab=mesCurto, curKey=todayStr().slice(0,7)){
   const W=900,H=280,L=78,R=16,T=16,B=30; const iw=W-L-R, ih=H-T-B;
   const vals = rows.flatMap(r=>[r.ent,r.sai,r.fim]);
   let hi = niceMax(Math.max(1,...vals)); let lo = Math.min(0,...rows.map(r=>r.fim)); if(lo<0) lo = -niceMax(-lo);
@@ -1240,17 +1250,54 @@ function fluxoChart(rows){
   let g="";
   for(let k=0;k<=4;k++){ const v=lo+(hi-lo)*k/4, y=Y(v); g+=`<line x1="${L}" x2="${W-R}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${L-8}" y="${y+4}" text-anchor="end" font-size="12" fill="var(--muted)">${compact(v)}</text>`; }
   if(lo<0) g+=`<line x1="${L}" x2="${W-R}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--muted)" stroke-width="1.2"/>`;
-  rows.forEach((r,i)=>{ const cx=L+gw*i+gw/2, cur=r.m===todayStr().slice(0,7);
+  rows.forEach((r,i)=>{ const cx=L+gw*i+gw/2, cur=r.m===curKey;
     if(cur) g+=`<rect x="${L+gw*i+2}" y="${T}" width="${gw-4}" height="${ih}" rx="8" fill="var(--surface-2)"/>`;
-    g+=`<rect x="${cx-bw-2}" y="${Y(r.ent)}" width="${bw}" height="${Math.max(0,Y(0)-Y(r.ent))}" rx="3" fill="var(--c-receber)"><title>${mesCurto(r.m)} · entradas ${money(r.ent)}</title></rect>`;
-    g+=`<rect x="${cx+2}" y="${Y(r.sai)}" width="${bw}" height="${Math.max(0,Y(0)-Y(r.sai))}" rx="3" fill="var(--c-pagar)"><title>${mesCurto(r.m)} · saídas ${money(r.sai)}</title></rect>`;
-    g+=`<text x="${cx}" y="${H-8}" text-anchor="middle" font-size="12" fill="${cur?"var(--fg)":"var(--muted)"}" font-weight="${cur?700:400}">${mesCurto(r.m)}</text>`; });
+    g+=`<rect x="${cx-bw-2}" y="${Y(r.ent)}" width="${bw}" height="${Math.max(0,Y(0)-Y(r.ent))}" rx="3" fill="var(--c-receber)"><title>${lab(r.m)} · entradas ${money(r.ent)}</title></rect>`;
+    g+=`<rect x="${cx+2}" y="${Y(r.sai)}" width="${bw}" height="${Math.max(0,Y(0)-Y(r.sai))}" rx="3" fill="var(--c-pagar)"><title>${lab(r.m)} · saídas ${money(r.sai)}</title></rect>`;
+    g+=`<text x="${cx}" y="${H-8}" text-anchor="middle" font-size="12" fill="${cur?"var(--fg)":"var(--muted)"}" font-weight="${cur?700:400}">${(rows.length<=16||i%2===0||cur)?lab(r.m):""}</text>`; });
   const pts = rows.map((r,i)=>[L+gw*i+gw/2, Y(r.fim)]);
   g+=`<path d="${pts.map((p,i)=>(i?"L":"M")+p[0].toFixed(1)+","+p[1].toFixed(1)).join(" ")}" fill="none" stroke="var(--c-fluxo)" stroke-width="2.6" stroke-linejoin="round"/>`;
-  rows.forEach((r,i)=>{ g+=`<circle cx="${pts[i][0].toFixed(1)}" cy="${pts[i][1].toFixed(1)}" r="4" fill="${r.fim<0?"var(--bad)":"var(--c-fluxo)"}" stroke="var(--surface)" stroke-width="2"><title>${mesCurto(r.m)} · saldo ${money(r.fim)}</title></circle>`; });
+  rows.forEach((r,i)=>{ g+=`<circle cx="${pts[i][0].toFixed(1)}" cy="${pts[i][1].toFixed(1)}" r="4" fill="${r.fim<0?"var(--bad)":"var(--c-fluxo)"}" stroke="var(--surface)" stroke-width="2"><title>${lab(r.m)} · saldo ${money(r.fim)}</title></circle>`; });
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Entradas, saídas e saldo acumulado por mês">${g}</svg>`;
 }
+function viewFluxoMes(){
+  const mk = ui.fxIni, cur = todayStr(); const real = ui.fxModo==="realizado";
+  const dataDe = e => real ? (e.pago ? (e.dataPag||e.venc) : null) : e.venc;
+  const L = allEntries().map(e=>({...e, d:dataDe(e)})).filter(e=>e.d && e.d.slice(0,7)===mk).sort((a,b)=>a.d.localeCompare(b.d)||(a.natureza==="receber"?-1:1));
+  const saldoIni = Number(fluxoCfg().saldos?.[mk])||0;
+  const nd = new Date(+mk.slice(0,4), +mk.slice(5,7), 0).getDate(); let acc = saldoIni;
+  const dias = [...Array(nd)].map((_,i)=>{ const d=`${mk}-${pad(i+1)}`; const it=L.filter(e=>e.d===d); const ent=r2(sum(it.filter(e=>e.natureza==="receber"),e=>e.valor)), sai=r2(sum(it.filter(e=>e.natureza==="pagar"),e=>e.valor)); const inicio=acc; acc=r2(acc+ent-sai); return {m:d,ent,sai,res:r2(ent-sai),inicio,fim:acc,it}; });
+  const ent=sum(dias,r=>r.ent), sai=sum(dias,r=>r.sai), fim=acc; const menor=dias.reduce((a,r)=>r.fim<a.fim?r:a,dias[0]); const negs=dias.filter(r=>r.fim<0);
+  const cats={receber:{},pagar:{}}; L.forEach(e=>{ cats[e.natureza][e.categoria||"Outros"]=(cats[e.natureza][e.categoria||"Outros"]||0)+e.valor; });
+  const catList = nat => Object.entries(cats[nat]).sort((a,b)=>b[1]-a[1]).map(([c,v])=>`<div class="hb"><span class="catname"><i style="background:${catColor(c)}"></i>${esc(c)}</span><span class="t"><span style="width:${(nat==="receber"?ent:sai)?v/(nat==="receber"?ent:sai)*100:0}%;background:${catColor(c)}"></span></span><span class="num">${money(v)}</span></div>`).join("");
+  const comMov = dias.filter(r=>r.it.length);
+  return `
+  <div class="head"><div><h2><span class="sw">${icon("fluxo")}</span>Fluxo de caixa</h2><p class="sub">Dia a dia de ${mesNome(mk)}: entradas, saídas e saldo</p></div>
+    <div class="row"><div class="monthnav"><button class="icon-btn" data-act="fx-mes" data-d="-1" aria-label="Mês anterior">‹</button><b>${mesNome(mk)}</b><button class="icon-btn" data-act="fx-mes" data-d="1" aria-label="Próximo mês">›</button></div>${pdfBtn()}</div></div>
+  <div class="toolbar">
+    ${seg("fxModo",[["previsto","Previsto (por vencimento)"],["realizado","Realizado (pago/recebido)"]],ui.fxModo).replace('class="seg"','class="seg" data-fx="modo"')}
+    <select id="fx-n" aria-label="Período"><option value="mes" selected>Mês (dia a dia)</option>${[3,6,12].map(n=>`<option value="${n}">${n} meses</option>`).join("")}<option value="ano">Ano (jan–dez)</option></select>
+    <label class="fxsaldo" for="fx-saldo">Saldo em conta no início de ${mesCurto(mk)}<input id="fx-saldo" inputmode="decimal" value="${esc(mIn(saldoIni))}" placeholder="0,00" autocomplete="off"></label>
+  </div>
+  <div class="kpis">
+    <div class="kpi" style="--kc:var(--c-receber)"><span class="l">Entradas no mês</span><span class="v">${money(ent)}</span><span class="d">${L.filter(e=>e.natureza==="receber").length} lançamento(s)</span></div>
+    <div class="kpi" style="--kc:var(--c-pagar)"><span class="l">Saídas no mês</span><span class="v">${money(sai)}</span><span class="d">${L.filter(e=>e.natureza==="pagar").length} lançamento(s)</span></div>
+    <div class="kpi" style="--kc:${ent-sai>=0?"var(--ok)":"var(--bad)"}"><span class="l">Resultado do mês</span><span class="v ${ent-sai>=0?"pos":"neg"}">${money(ent-sai)}</span><span class="d">${ent?pctf((ent-sai)/ent*100,1)+" das entradas":"—"}</span></div>
+    <div class="kpi" style="--kc:var(--c-fluxo)"><span class="l">Saldo no fim do mês</span><span class="v ${fim<0?"neg":""}">${money(fim)}</span><span class="d">Menor saldo: ${money(menor.fim)} em ${dt(menor.m).slice(0,5)}</span></div>
+  </div>
+  ${negs.length?`<div class="alert"><b>Atenção:</b> o saldo fica negativo a partir de ${dt(negs[0].m).slice(0,5)}. Antecipe recebimentos, adie despesas ou revise o saldo inicial.</div>`:""}
+  <div class="panel chart"><h3>Entradas × saídas por dia e saldo</h3>${fluxoChart(dias, d=>String(+d.slice(8,10)), cur)}<div class="legend"><span><i style="background:var(--c-receber)"></i>Entradas</span><span><i style="background:var(--c-pagar)"></i>Saídas</span><span><i style="background:var(--c-fluxo)"></i>Saldo</span></div></div>
+  <div class="grid2"><div class="panel"><h3>Entradas por categoria</h3>${catList("receber")?`<div class="hbars">${catList("receber")}</div>`:`<p class="note">Sem entradas no mês.</p>`}</div>
+    <div class="panel"><h3>Saídas por categoria</h3>${catList("pagar")?`<div class="hbars">${catList("pagar")}</div>`:`<p class="note">Sem saídas no mês.</p>`}</div></div>
+  <div class="panel"><h3>Movimentos dia a dia</h3>
+    ${comMov.length?`<div class="tw"><table style="min-width:760px"><thead><tr><th>Dia</th><th>Descrição</th><th>Categoria</th><th>Status</th><th class="r">Entrada</th><th class="r">Saída</th><th class="r">Saldo do dia</th></tr></thead><tbody>
+      <tr class="fxsi"><td colspan="6" class="note">Saldo inicial</td><td class="r num">${money(saldoIni)}</td></tr>
+      ${comMov.map(r=>r.it.map((e,k)=>`<tr${r.m===cur?' style="background:color-mix(in srgb,var(--c-fluxo) 7%,transparent)"':""}><td class="num">${k===0?`<b>${dt(r.m).slice(0,5)}</b>`:""}</td><td class="desc">${esc(e.descricao)}${e.detalhe?`<small>${esc(e.detalhe)}</small>`:""}</td><td>${esc(e.categoria)}</td><td>${pill(e)}</td>
+        <td class="r num pos">${e.natureza==="receber"?money(e.valor):""}</td><td class="r num neg">${e.natureza==="pagar"?money(e.valor):""}</td><td class="r num" style="font-weight:700">${k===r.it.length-1?`<span class="${r.fim<0?"neg":""}">${money(r.fim)}</span>`:""}</td></tr>`).join("")).join("")}
+    </tbody><tfoot><tr><td colspan="4">Total do mês</td><td class="r num">${money(ent)}</td><td class="r num">${money(sai)}</td><td class="r num">${money(fim)}</td></tr></tfoot></table></div>`:`<p class="note">Nenhum movimento ${real?"pago ou recebido":"com vencimento"} neste mês.</p>`}</div>`;
+}
 function viewFluxo(){
+  if (ui.fxMes) return viewFluxoMes();
   const d = fluxoDados(ui.fxIni, ui.fxN, ui.fxModo);
   const ent=sum(d.rows,r=>r.ent), sai=sum(d.rows,r=>r.sai), fim=d.rows[d.rows.length-1].fim;
   const menor = d.rows.reduce((a,r)=>r.fim<a.fim?r:a, d.rows[0]);
@@ -1263,7 +1310,7 @@ function viewFluxo(){
     <div class="row"><div class="monthnav"><button class="icon-btn" data-act="fx-mes" data-d="-1" aria-label="Período anterior">‹</button><b>${ui.fxAno?ui.fxIni.slice(0,4):mesCurto(d.months[0])+" – "+mesCurto(d.months[d.months.length-1])}</b><button class="icon-btn" data-act="fx-mes" data-d="1" aria-label="Próximo período">›</button></div>${pdfBtn()}</div></div>
   <div class="toolbar">
     ${seg("fxModo",[["previsto","Previsto (por vencimento)"],["realizado","Realizado (pago/recebido)"]],ui.fxModo).replace('class="seg"','class="seg" data-fx="modo"')}
-    <select id="fx-n" aria-label="Período">${[3,6,12].map(n=>`<option value="${n}" ${!ui.fxAno&&ui.fxN===n?"selected":""}>${n} meses</option>`).join("")}<option value="ano" ${ui.fxAno?"selected":""}>Ano (jan–dez)</option></select>
+    <select id="fx-n" aria-label="Período"><option value="mes">Mês (dia a dia)</option>${[3,6,12].map(n=>`<option value="${n}" ${!ui.fxAno&&ui.fxN===n?"selected":""}>${n} meses</option>`).join("")}<option value="ano" ${ui.fxAno?"selected":""}>Ano (jan–dez)</option></select>
     <label class="fxsaldo" for="fx-saldo">Saldo em conta no início de ${mesCurto(d.months[0])}<input id="fx-saldo" inputmode="decimal" value="${esc(mIn(d.saldoIni))}" placeholder="0,00" autocomplete="off"></label>
   </div>
   <div class="kpis">
@@ -1656,7 +1703,7 @@ async function garantirPerfil(user){
     await saveRec({id:PERFIL_ID,tipo:"config",nome:md.nome||"",email:user.email,telefone:md.telefone||"",cpf:md.cpf||"",salt:salt||"",pinHash:pinHash||"",criado:new Date().toISOString()}); }
   else if(p.email!==user.email){ const y=clone(p); y.email=user.email; saveRec(y); }
 }
-function sairLimpo(){ tgSt=null; tgCod=null; if(canal&&sb) sb.removeChannel(canal); canal=null; sessao=null; uidAtual=null; recs=new Map(); queues.clear(); ui.auth=false; ui.sec=false; ui.lk="login"; lockState=""; clearTimeout(idleT); closeModal(); render(); }
+function sairLimpo(){ tgSt=null; tgCod=null; souAdmin=null; adminLista=null; if(canal&&sb) sb.removeChannel(canal); canal=null; sessao=null; uidAtual=null; recs=new Map(); queues.clear(); ui.auth=false; ui.sec=false; ui.lk="login"; lockState=""; clearTimeout(idleT); closeModal(); render(); }
 async function sair(){ try{ await sb.auth.signOut(); }catch(e){} sairLimpo(); }
 
 /* --- Telas de entrada --- */
@@ -1773,6 +1820,34 @@ function tgCard(){
       <p class="note" style="margin:8px 0 0">Ou envie para <b>@${esc(bot)}</b> a mensagem <b>/vincular ${tgCod}</b>.</p>`:`<p class="note">Envie ao seu bot a mensagem <b>/vincular ${tgCod}</b>.</p><div class="row"><button class="btn" data-act="tg-atualizar">Já conectei</button></div>`}`
     :`<div class="row"><button class="btn pri" style="--mc:#229ED9" data-act="tg-gerar">Conectar Telegram</button></div>`}
   </div>`;
+}
+/* ---------- Usuários (somente administrador: dados cadastrais, nunca financeiros) ---------- */
+async function adminCarregar(){ adminLista="carregando"; const {data,error}=await sb.rpc("admin_usuarios"); adminLista = error ? {erro:error.message} : (data||[]); if(ui.view==="usuarios") render(); }
+function viewUsuarios(){
+  const head = `<div class="head"><div><h2><span class="sw">${icon("usuarios")}</span>Usuários</h2><p class="sub">Quem se cadastrou e usa o Money · somente dados cadastrais e de acesso</p></div>
+    <div class="row"><button class="btn" data-act="adm-recarregar">Atualizar</button>${Array.isArray(adminLista)&&adminLista.length?`<button class="btn" data-act="adm-csv">Exportar CSV</button>`:""}</div></div>`;
+  if(!souAdmin) return head+`<div class="panel empty"><b>Acesso restrito</b>Esta área é só do administrador.</div>`;
+  if(adminLista===null){ adminCarregar(); return head+`<div class="panel"><p class="thinking" style="margin:0">Carregando usuários…</p></div>`; }
+  if(adminLista==="carregando") return head+`<div class="panel"><p class="thinking" style="margin:0">Carregando usuários…</p></div>`;
+  if(adminLista.erro) return head+`<div class="alert">Não foi possível carregar: ${esc(adminLista.erro)}</div>`;
+  const t=todayStr(); const d30=addDays(t,-30); const L=adminLista;
+  const ativos=L.filter(u=>(u.ultima_atividade||u.ultimo_acesso||"").slice(0,10)>=d30).length;
+  const b=adminBusca.trim().toLowerCase(); const F=L.filter(u=>!b||`${u.nome} ${u.email} ${u.telefone}`.toLowerCase().includes(b));
+  const dth = s => s ? dt(s.slice(0,10)) : "—";
+  return head+`
+  <div class="kpis">
+    <div class="kpi" style="--kc:var(--accent)"><span class="l">Usuários cadastrados</span><span class="v">${L.length}</span><span class="d">${L.filter(u=>u.confirmado).length} com e-mail confirmado</span></div>
+    <div class="kpi" style="--kc:var(--ok)"><span class="l">Ativos nos últimos 30 dias</span><span class="v">${ativos}</span><span class="d">entraram ou lançaram algo</span></div>
+    <div class="kpi" style="--kc:var(--c-cartao)"><span class="l">Novos este mês</span><span class="v">${L.filter(u=>(u.cadastro||"").slice(0,7)===t.slice(0,7)).length}</span><span class="d">cadastros em ${mesNome(t.slice(0,7))}</span></div>
+    <div class="kpi" style="--kc:#229ED9"><span class="l">Telegram conectado</span><span class="v">${L.filter(u=>u.telegram_conectado).length}</span><span class="d">${L.filter(u=>u.telegram_liberado).length} liberado(s)</span></div>
+  </div>
+  <div class="toolbar"><input type="search" id="adm-busca" placeholder="Buscar nome, e-mail ou telefone…" value="${esc(adminBusca)}"></div>
+  <div class="tw"><table style="min-width:900px"><thead><tr><th>Nome</th><th>E-mail</th><th>Telefone</th><th>Cadastro</th><th>Último acesso</th><th>Última atividade</th><th>Telegram</th></tr></thead><tbody>
+    ${F.map(u=>{ const ativo=(u.ultima_atividade||u.ultimo_acesso||"").slice(0,10)>=d30; return `<tr><td class="desc">${esc(u.nome||"—")}${u.confirmado?"":`<small>e-mail não confirmado</small>`}</td><td>${esc(u.email)}</td><td>${esc(u.telefone||"—")}</td><td class="num">${dth(u.cadastro)}</td><td class="num">${dth(u.ultimo_acesso)}</td>
+      <td><span class="pill ${ativo?"st-pago":"st-aberto"}">${ativo?"Ativo":"Inativo"}</span> <span class="note">${dth(u.ultima_atividade)}</span></td>
+      <td>${u.telegram_conectado?`<span class="pill st-pago">Conectado</span>`:u.telegram_liberado?`<span class="pill st-proximo">Liberado</span>`:""} <button class="btn sm ${u.telegram_liberado?"ghost":""}" data-act="adm-tg" data-email="${esc(u.email)}" data-on="${u.telegram_liberado?0:1}">${u.telegram_liberado?"Tirar":"Liberar"}</button></td></tr>`; }).join("")||`<tr><td colspan="7" class="note">Nenhum usuário encontrado.</td></tr>`}
+  </tbody></table></div>
+  <p class="note">Por privacidade (LGPD), esta página mostra apenas dados cadastrais e de acesso. Lançamentos, valores, saldos e investimentos dos usuários não são acessíveis ao administrador. “Última atividade” é só a data do último registro salvo.</p>`;
 }
 function viewCadastro(){
   const p=perfil()||{}; const email=sessao?.user?.email||p.email||"";
@@ -2242,6 +2317,10 @@ document.addEventListener("click", ev=>{
     case "pin-esqueci": closeModal(); formNovoPin(); break;
     case "pin-esqueci-lock": formNovoPin(()=>unlockApp()); break;
     case "conta-excluir": formExcluirConta(); break;
+    case "ord": { const k=b.dataset.k; const o=ui.ord||{k:"venc",d:1}; ui.ord = o.k===k ? {k,d:-o.d} : {k,d:(k==="valor"?-1:1)}; try{localStorage.setItem(LSKEY+":ord",JSON.stringify(ui.ord));}catch(e){} render(); break; }
+    case "adm-recarregar": adminLista=null; render(); break;
+    case "adm-tg": (async()=>{ const on=b.dataset.on==="1"; const {error}=await sb.rpc("admin_telegram",{p_email:b.dataset.email,p_liberar:on}); toast(error?"Não foi possível alterar.":on?"Telegram liberado.":"Telegram retirado."); adminLista=null; render(); })(); break;
+    case "adm-csv": { const L=Array.isArray(adminLista)?adminLista:[]; const q=v=>`"${String(v??"").replace(/"/g,'""')}"`; download(`money-usuarios-${todayStr()}.csv`, "\ufeff"+["Nome;E-mail;Telefone;Cadastro;Último acesso;Última atividade;Telegram"].concat(L.map(u=>[u.nome,u.email,u.telefone,(u.cadastro||"").slice(0,10),(u.ultimo_acesso||"").slice(0,10),(u.ultima_atividade||"").slice(0,10),u.telegram_conectado?"conectado":u.telegram_liberado?"liberado":""].map(q).join(";"))).join("\n")); break; }
     case "tg-gerar": (async()=>{ const {data,error}=await sb.rpc("telegram_gerar_codigo"); if(error){ toast("Não foi possível gerar o código."); return; } tgCod=data; render(); })(); break;
     case "tg-atualizar": tgCod=null; tgCarregar(true); break;
     case "tg-desc": ask("Desconectar Telegram","O bot deixa de responder e de mandar alertas. Você pode conectar de novo quando quiser.",[{label:"Desconectar",cls:"danger",fn:async()=>{ await sb.rpc("telegram_desconectar"); tgCod=null; await tgCarregar(true); toast("Telegram desconectado."); }}]); break;
@@ -2307,6 +2386,7 @@ document.addEventListener("input", ev=>{
   if (ev.target.classList && ev.target.classList.contains("pin")) { ev.target.value=soDig(ev.target.value).slice(0,4); if(ev.target.id==="lg_pin"&&ev.target.value.length===4) $("#lkform")?.requestSubmit(); if(ev.target.id==="gt_pin"&&ev.target.value.length===4) $("#mform")?.requestSubmit(); return; }
   if (["cd_cpf","pf_cpf","rs_cpf"].includes(ev.target.id)) { ev.target.value=fmtCPF(ev.target.value); return; }
   if (["cd_tel","pf_tel"].includes(ev.target.id)) { ev.target.value=fmtTel(ev.target.value); return; }
+  if (ev.target.id==="adm-busca"){ adminBusca=ev.target.value; render(); return; }
   const f = ev.target.dataset && ev.target.dataset.filter;
   if (f){ if(f==="todos") ui.todos=ev.target.checked; else ui[f]=ev.target.value; render(); return; }
   if (ev.target.id==="venc1") ev.target.dataset.touched="1";
@@ -2322,7 +2402,7 @@ document.addEventListener("change", ev=>{
   if (ev.target.classList && ev.target.classList.contains("regper")){ ui.regPer=ev.target.value; if(ui.regPer==="custom"&&!ui.regDe){ ui.regDe=addMonths(todayStr(),-6); ui.regAte=todayStr(); } render(); return; }
   if (ev.target.classList && (ev.target.classList.contains("regde")||ev.target.classList.contains("regate"))){ if(ev.target.value){ if(ev.target.classList.contains("regde")) ui.regDe=ev.target.value; else ui.regAte=ev.target.value; render(); } return; }
   if (ev.target.id==="fx-saldo"){ const cfg=clone(fluxoCfg()); cfg.saldos=cfg.saldos||{}; cfg.saldos[ui.fxIni]=r2(parseMoney(ev.target.value)); saveRec(cfg); return; }
-  if (ev.target.id==="fx-n"){ if(ev.target.value==="ano"){ ui.fxAno=true; ui.fxN=12; ui.fxIni=ui.fxIni.slice(0,4)+"-01"; } else { ui.fxAno=false; ui.fxN=+ev.target.value; } render(); return; }
+  if (ev.target.id==="fx-n"){ if(ev.target.value==="mes"){ ui.fxMes=true; ui.fxAno=false; ui.fxN=1; ui.fxIni=todayStr().slice(0,7); } else if(ev.target.value==="ano"){ ui.fxMes=false; ui.fxAno=true; ui.fxN=12; ui.fxIni=ui.fxIni.slice(0,4)+"-01"; } else { if(ui.fxMes) ui.fxIni=shiftMonth(ui.fxIni,-2); ui.fxMes=false; ui.fxAno=false; ui.fxN=+ev.target.value; } render(); return; }
   if (ev.target.name==="fxModo" && !ev.target.closest("#mform")){ ui.fxModo=ev.target.value; render(); return; }
   if (ev.target.tagName==="SELECT" && ev.target.id){ const nv=document.getElementById(ev.target.id+"_nova"); if(nv){ nv.hidden = ev.target.value!=="__nova__"; if(!nv.hidden) nv.focus(); } }
   if (ev.target.closest && ev.target.closest("#mform") && modalInput) modalInput(new FormData($("#mform")));
