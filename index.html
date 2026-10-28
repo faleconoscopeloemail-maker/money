@@ -389,6 +389,7 @@ tfoot td{font-weight:700;background:var(--surface-2)}
 .cart td small{display:block;font-size:11px;color:var(--muted);font-weight:500}
 .tick{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.02em;padding:2px 7px;border-radius:6px;background:color-mix(in srgb,var(--c-invest) 12%,var(--surface));color:var(--c-invest);white-space:nowrap}
 .tick.more{background:var(--surface-2);color:var(--muted)}
+.tick.on{background:color-mix(in srgb,var(--ok) 12%,var(--surface));color:var(--ok)}
 .ticks{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
 .cctiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,330px),1fr));gap:16px}
 .cctile{background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;min-width:0}
@@ -954,7 +955,7 @@ function contratoCard(c,r,M){
   const sis = {price:"Price (parcelas iguais)",sac:"SAC (amortização constante)",sem:"Sem juros"}[c.sistema]||"";
   const prog = r.n?r.nPagas/r.n*100:0;
   return `<div class="ccard ${open?"wide":""}" id="ct-${c.id}">
-    <div class="row" style="justify-content:space-between;align-items:flex-start"><div style="min-width:0"><h4>${esc(c.nome)}</h4><div class="who">${esc(c.parte||"")}${c.objeto?" · "+esc(c.objeto):""}</div>${foraFluxo(c)?`<span class="tick more" style="margin-top:6px" title="Não entra em contas a ${MODS[c.modalidade].nat} nem no fluxo">Fora de contas e fluxo</span>`:""}</div>
+    <div class="row" style="justify-content:space-between;align-items:flex-start"><div style="min-width:0"><h4>${esc(c.nome)}</h4><div class="who">${esc(c.parte||"")}${c.objeto?" · "+esc(c.objeto):""}</div>${foraFluxo(c)?`<span class="tick more" style="margin-top:6px" title="Não entra em contas a ${MODS[c.modalidade].nat} nem no fluxo">Só anotação</span>`:`<span class="tick on" style="margin-top:6px" title="Parcelas lançadas em contas a ${MODS[c.modalidade].nat} e no fluxo">✓ Em contas a ${MODS[c.modalidade].nat} e no fluxo</span>`}</div>
       ${r.vencidas?`<span class="pill st-vencido">${r.vencidas} vencida(s)</span>`:r.aberto===0&&r.n?`<span class="pill st-pago">${rec?"Recebido":"Quitado"}</span>`:""}</div>
     <div class="row" style="gap:6px"><span class="chip" style="--cc:var(--mc)">${sis}</span>${c.categoria?`<span class="chip" style="--cc:${catColor(c.categoria)}">${esc(c.categoria)}</span>`:""}${(c.parcelas||[]).some(p=>p.ajustado)?`<span class="chip" style="--cc:var(--c-cartao)">${c.parcelas.filter(p=>p.ajustado).length} parcela(s) ajustada(s)</span>`:""}${c.sistema!=="sem"?`<span class="chip" style="--cc:var(--warn)">${pctf(taxaM,2)} a.m.${c.taxaCalculada?" (calculada)":""}</span>`:""}</div>
     <div class="facts">
@@ -968,7 +969,7 @@ function contratoCard(c,r,M){
       <div class="fact"><div class="l">${rec?"Falta receber":"Falta pagar"}</div><div class="v">${money(r.aberto)}</div></div>
     </div>
     <div><div class="bar"><span style="width:${prog}%"></span></div><div class="prog"><span>${r.nPagas} de ${r.n} parcelas</span><span>${Math.round(prog)}%</span></div></div>
-    <div class="row"><button class="btn sm" data-act="toggle-parcelas" data-id="${c.id}">${open?"Ocultar parcelas":"Ver parcelas"}</button><button class="btn sm" data-act="edit-contrato" data-id="${c.id}">Editar</button><button class="btn sm ghost danger" data-act="del-contrato" data-id="${c.id}">Excluir</button></div>
+    <div class="row"><button class="btn sm" data-act="toggle-parcelas" data-id="${c.id}">${open?"Ocultar parcelas":"Ver parcelas"}</button><button class="btn sm" data-act="edit-contrato" data-id="${c.id}">Editar</button><button class="btn sm ${foraFluxo(c)?"pri":""}" style="--mc:var(--mc)" data-act="fluxo-contrato" data-id="${c.id}">${foraFluxo(c)?"Lançar no fluxo":"Deixar só como anotação"}</button><button class="btn sm ghost danger" data-act="del-contrato" data-id="${c.id}">Excluir</button></div>
     ${open?`<div class="tw"><table><thead><tr><th>Nº</th><th>Vencimento</th><th class="r">Amortização</th><th class="r">Juros</th><th class="r">Taxas</th><th class="r">Parcela</th><th class="r">Saldo após</th><th>Status</th><th class="r"></th></tr></thead><tbody>
       ${(c.parcelas||[]).map((p,idx)=>{ if(ui.per==="ano" && !inPer(p.venc)) return ""; const e={pago:p.pago,venc:p.venc,natureza:M.nat};return `<tr class="${p.pago?"is-pago":""}"><td class="num">${p.n}</td><td class="num">${dt(p.venc)}</td><td class="r num">${money(p.amort)}</td><td class="r num">${money(p.juros)}</td><td class="r num">${money(p.taxas)}</td><td class="r num"><b>${money(p.valor)}</b>${p.ajustado?`<small class="adj" title="Valor calculado: ${money(p.valorCalc)}">ajustada</small>`:""}</td><td class="r num">${money(p.saldo)}</td><td>${pill(e)}</td>
         <td><div class="acts"><button class="pay ${p.pago?"done":""}" data-act="pago" data-key="c:${c.id}:${idx}">${p.pago?"✓ "+(rec?"Recebido":"Pago"):(rec?"Receber":"Pagar")}</button><button class="icon-btn" data-act="edit-parcela" data-id="${c.id}" data-idx="${idx}" title="Editar parcela" aria-label="Editar parcela ${p.n}">✎</button></div></td></tr>`;}).join("")}
@@ -1990,7 +1991,9 @@ function formContrato(mod,id){
       ${fld("parte",M.parte,inp("parte",c?.parte,`placeholder="${M.parteHint}" autocomplete="off"`))}</div>
     <div class="fg">${fld("objeto",M.obj,inp("objeto",c?.objeto,`placeholder="${M.objHint}" autocomplete="off"`))}
       ${fld("categoria","Categoria",catSelect("categoria",M.nat,c?.categoria||"",`Padrão (${M.sing})`),"Aparece em contas a "+M.nat+" e nos relatórios.")}</div>
-    <div class="escopo"><label class="chk" style="padding:0;color:var(--fg);font-weight:600"><input type="checkbox" name="entraFluxo" ${(c?!foraFluxo(c):mod!=="aquisicao")?"checked":""}> Lançar as parcelas em contas a ${M.nat} e no fluxo de caixa</label><span class="hint">Marcado: cada parcela aparece em contas a ${M.nat} ligada a este registro — ao marcar como ${M.nat==="pagar"?"paga":"recebida"} lá (ou aqui), o card atualiza. Desmarcado: fica só nesta aba.</span></div>
+    <div class="escopo"><span class="lb" style="font-weight:700;color:var(--fg)">O que fazer com as parcelas?</span>
+      ${seg("entraFluxo",[["sim",`Lançar em contas a ${M.nat} e no fluxo`],["nao","Só anotação"]],(c?!foraFluxo(c):mod!=="aquisicao")?"sim":"nao")}
+      <span class="hint"><b>Lançar:</b> descrição, categoria, parcelas, datas e valores viram lançamentos em contas a ${M.nat} e no fluxo de caixa, ligados a este card — ao marcar como ${M.nat==="pagar"?"paga":"recebida"} lá (ou aqui), o card atualiza. <b>Só anotação:</b> fica apenas nesta aba, sem entrar em contas nem no fluxo. Dá para mudar depois, no próprio card.</span></div>
     <div class="sectitle">Valores</div>
     <div class="fg">${fld("valorTotal",rec?"Valor devido (R$)":"Valor total do bem / contrato (R$)",moneyInp("valorTotal",c?.valorTotal))}
       ${fld("entrada","Entrada (R$)",moneyInp("entrada",c?.entrada),rec?"Valor que já foi pago de início, se houver.":"Abatida do valor financiado.")}</div>
@@ -2036,7 +2039,7 @@ function contratoFromForm(fd,mod,c){
   return {...(c||{}), id:c?.id||uid("c"), tipo:"contrato", modalidade:mod, nome:String(fd.get("nome")||"").trim(), parte:String(fd.get("parte")||"").trim(), objeto:String(fd.get("objeto")||"").trim(),
     valorTotal:r2(parseMoney(fd.get("valorTotal"))), entrada:r2(parseMoney(fd.get("entrada"))), nParcelas:parseInt(fd.get("nParcelas"))||1, primeiroVenc:fd.get("primeiroVenc")||todayStr(),
     jaPagas:parseInt(fd.get("jaPagas"))||0, sistema:fd.get("sistema")||"price", taxa:parseMoney(fd.get("taxa")), taxaPeriodo:fd.get("taxaPeriodo")||"am",
-    parcelaInformada:r2(parseMoney(fd.get("parcelaInformada"))), taxas, obs:fd.get("obs")||"", semFluxo: mod!=="aquisicao" && !fd.get("entraFluxo"), comFluxo: mod==="aquisicao" && !!fd.get("entraFluxo")};
+    parcelaInformada:r2(parseMoney(fd.get("parcelaInformada"))), taxas, obs:fd.get("obs")||"", semFluxo: mod!=="aquisicao" && fd.get("entraFluxo")!=="sim", comFluxo: mod==="aquisicao" && fd.get("entraFluxo")==="sim"};
 }
 
 /* --- Investimentos --- */
@@ -2394,6 +2397,9 @@ document.addEventListener("click", ev=>{
     case "del-compra": { const it=byTipo("lanc").filter(r=>(r.grupo||r.id)===b.dataset.g); ask("Excluir compra",`Excluir <b>${esc(it[0]?.descricao)}</b> e suas ${it.length} parcela(s)?`,[{label:"Excluir compra",cls:"danger",fn:()=>{it.forEach(x=>delRec(x.id));toast("Compra excluída.");}}],"--c-cartao"); break; }
     case "fatura": { const v=b.dataset.v==="1"; byTipo("lanc").filter(r=>isCard(r)&&cardKey(r)===b.dataset.k&&(ui.per==="ano"&&!b.dataset.m?inPer(r.vencimento):r.vencimento.slice(0,7)===(b.dataset.m||ui.mes))&&!!r.pago!==v).forEach(r=>{const y=clone(r);y.pago=v;y.dataPagamento=v?todayStr():null;saveRec(y);}); toast(v?"Fatura marcada como paga.":"Fatura reaberta."); break; }
     case "novo-contrato": formContrato(b.dataset.mod); break;
+    case "fluxo-contrato": { const c0=getRec(b.dataset.id); if(!c0) break; const c=clone(c0); const lancar=foraFluxo(c);
+      if(c.modalidade==="aquisicao") c.comFluxo=lancar; else c.semFluxo=!lancar; saveRec(c);
+      const nat=MODS[c.modalidade].nat; toast(lancar?`Parcelas lançadas em contas a ${nat} e no fluxo.`:"Agora é só anotação: saiu de contas e do fluxo."); break; }
     case "edit-contrato": { const c=getRec(b.dataset.id); c&&formContrato(c.modalidade,c.id); break; }
     case "open-contrato": ui.open.add(b.dataset.id); goView(b.dataset.mod, ()=>setTimeout(()=>{const el=document.getElementById("ct-"+b.dataset.id); el&&el.scrollIntoView({block:"start"});},50)); break;
     case "del-contrato": { const c=getRec(b.dataset.id); if(!c) break; ask("Excluir registro",`Excluir <b>${esc(c.nome)}</b>? Todas as ${c.parcelas?.length||0} parcelas saem de contas a ${MODS[c.modalidade].nat}.`,[{label:"Excluir",cls:"danger",fn:()=>{delRec(c.id);toast("Registro excluído.");}}],`--c-${c.modalidade}`); break; }
