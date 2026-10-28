@@ -194,6 +194,19 @@ tfoot td{font-weight:700;background:var(--surface-2)}
 .legend span{display:inline-flex;align-items:center;gap:6px}
 .legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
 .hbars{display:flex;flex-direction:column;gap:12px}
+.ghead{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 0 16px;flex-wrap:wrap}.ghead h3{margin:0}
+.gtog{display:inline-flex;gap:2px;background:var(--surface-2);border-radius:10px;padding:3px}
+.gtog button{border:0;background:none;font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;color:var(--muted);cursor:pointer;font-weight:500}
+.gtog button.on{background:var(--surface);color:var(--fg);font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.pie{display:grid;grid-template-columns:170px minmax(0,1fr);gap:18px;align-items:center}
+.pie svg{width:170px;height:170px;display:block}
+.pie .pt{font-size:11px;fill:var(--muted)}.pie .pv{font-size:12.5px;font-weight:800;fill:var(--fg)}
+.pleg{display:flex;flex-direction:column;gap:8px;min-width:0}
+.pleg div{display:grid;grid-template-columns:10px minmax(0,1fr) auto auto;gap:8px;align-items:center;font-size:13px}
+.pleg i{width:10px;height:10px;border-radius:3px}.pleg span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pleg b{font-variant-numeric:tabular-nums}.pleg small{color:var(--muted);font-variant-numeric:tabular-nums;text-align:right}
+@media (max-width:560px){.pie{grid-template-columns:1fr;justify-items:center}.pleg{width:100%}}
+.cadsec{margin:26px 0 12px;font-size:17px;font-family:var(--f-display);font-weight:700;display:flex;align-items:center;gap:8px}.cadsec svg{width:20px;height:20px}
 .hb{display:grid;grid-template-columns:110px minmax(0,1fr) auto;gap:12px;align-items:center;font-size:13px}
 .hb .t{height:10px;border-radius:99px;background:var(--surface-2);overflow:hidden}
 .hb .t span{display:block;height:100%;border-radius:99px}
@@ -685,7 +698,8 @@ function togglePago(key){
 /* ============ Estado de tela ============ */
 const ui = { view:"painel", mes: todayStr().slice(0,7), todos:false, status:"todos", origem:"todas", busca:"", per:"mes", dash:new Set(), lk:"login", lkEmail:"", auth:false, sec:false, open:new Set(), fxIni: shiftMonth(todayStr().slice(0,7),-2), fxN:12, fxModo:"previsto" };
 try{ const o=JSON.parse(localStorage.getItem(LSKEY+":ord")||"null"); if(o&&o.k) ui.ord=o; }catch(e){}
-try{ const v=localStorage.getItem(LSKEY+":view"); if(v && !PROTEGIDAS.has(v)) ui.view=v; }catch(e){}
+try{ const v=localStorage.getItem(LSKEY+":view"); if(v && !PROTEGIDAS.has(v)) ui.view = v==="categorias" ? "cadastro" : v; }catch(e){}
+try{ ui.graf=JSON.parse(localStorage.getItem(LSKEY+":graf")||"{}")||{}; }catch(e){ ui.graf={}; }
 let renderPending=false;
 function scheduleRender(){ if(renderPending) return; renderPending=true; requestAnimationFrame(()=>{renderPending=false;render();}); }
 
@@ -711,7 +725,7 @@ const VIEWS = [
   {g:"Fluxo de caixa", items:[["receber","Contas a receber","--c-receber"],["pagar","Contas a pagar","--c-pagar"],["fluxo","Fluxo de caixa","--c-fluxo"],["cartao","Cartão de crédito","--c-cartao"]]},
   {g:"Compromissos", items:[["financiamento","Financiamentos","--c-financiamento"],["emprestimo","Empréstimos","--c-emprestimo"],["aquisicao","Aquisições","--c-aquisicao"],["devedor","Devedores","--c-devedor"]]},
   {g:"Patrimônio", items:[["invest","Investimentos","--c-invest"]]},
-  {g:"Ajustes", items:[["categorias","Categorias","--c-conta"],["cadastro","Meu cadastro","--c-conta"]]},
+  {g:"Ajustes", items:[["cadastro","Meu cadastro","--c-conta"]]},
 ];
 const viewColor = v => (VIEWS.flatMap(g=>g.items).find(i=>i[0]===v)||[,, "--accent"])[2];
 
@@ -749,7 +763,7 @@ function render(){
   const main = $("#main");
   main.style.setProperty("--mc",`var(${viewColor(ui.view)})`);
   const v = ui.view;
-  main.innerHTML = v==="painel"?viewPainel(): v==="pagar"||v==="receber"?viewLista(v): v==="cartao"?viewCartao(): MODS[v]?viewContratos(v): v==="invest"?viewInvest(): v==="categorias"?viewCategorias(): v==="fluxo"?viewFluxo(): v==="cadastro"?viewCadastro(): v==="usuarios"?viewUsuarios(): viewPainel();
+  main.innerHTML = v==="painel"?viewPainel(): v==="pagar"||v==="receber"?viewLista(v): v==="cartao"?viewCartao(): MODS[v]?viewContratos(v): v==="invest"?viewInvest(): v==="categorias"?viewCadastro(): v==="fluxo"?viewFluxo(): v==="cadastro"?viewCadastro(): v==="usuarios"?viewUsuarios(): viewPainel();
   main.insertAdjacentHTML("beforeend", AVISO_LEGAL);
   if (fid){ const el=document.getElementById(fid); if(el){ el.focus(); if(sel&&el.setSelectionRange) try{el.setSelectionRange(sel[0],sel[1]);}catch(e){} } }
 }
@@ -817,8 +831,8 @@ function viewPainel(){
     </div>
   </div>
   <div class="grid2">
-    <div class="panel"><h3>Saídas ${perDe()} por origem</h3>${byO.length?`<div class="hbars">${byO.map(([o,v])=>`<div class="hb"><span>${ORIGENS[o]}</span><span class="t"><span style="width:${v/maxO*100}%;background:var(--c-${o})"></span></span><span class="num">${money(v)}</span></div>`).join("")}</div>`:`<p class="note">Sem saídas neste mês.</p>`}</div>
-    <div class="panel"><h3>Gastos ${perDe()} por categoria</h3>${byC.length?`<div class="hbars">${byC.map(([c,v])=>`<div class="hb"><span title="${esc(c)}" class="catname"><i style="background:${catColor(c)}"></i>${esc(c)}</span><span class="t"><span style="width:${v/maxC*100}%;background:${catColor(c)}"></span></span><span class="num">${money(v)}</span></div>`).join("")}</div>`:`<p class="note">Contas e cartão do mês aparecem aqui por categoria.</p>`}</div>
+    <div class="panel">${grafHead("Saídas "+perDe()+" por origem","origem",byO.length)}${byO.length?distChart("origem",byO.map(([o,v])=>({nome:ORIGENS[o],valor:v,cor:`var(--c-${o})`}))):`<p class="note">Sem saídas neste mês.</p>`}</div>
+    <div class="panel">${grafHead("Gastos "+perDe()+" por categoria","cat",byC.length)}${byC.length?distChart("cat",byC.map(([c,v])=>({nome:c,valor:v,cor:catColor(c)}))):`<p class="note">Contas e cartão do mês aparecem aqui por categoria.</p>`}</div>
   </div>`;
 }
 function barChart(series){
@@ -930,9 +944,8 @@ function resumoDevedores(cs){
   const tot=sum(linhas,it=>it.p.valor), aberto=sum(linhas.filter(it=>!it.p.pago),it=>it.p.valor), atr=sum(atraso,it=>it.p.valor);
   const head=`<thead><tr><th>Quem</th><th>O quê</th><th>Parcela</th><th>Vencimento</th><th class="r">Valor</th><th>Status</th><th></th></tr></thead>`;
   return `<div class="panel" style="--mc:var(--c-devedor)"><h3>Quem me deve · ${perCurto()}</h3>
-    ${pessoas.length?`<div class="list" style="margin-bottom:14px">${pessoas.map(([k,o])=>`<div class="li"><span class="dd sm" style="color:var(--c-devedor);font-weight:800">${o.n||0}×</span><span class="nm">${esc(k)}<small>${o.n?`${money(o.t)} no período${o.t-o.a>0.004?` · recebido ${money(o.t-o.a)}`:""}`:"nada no período"}${o.atr?` · <b class="neg">${money(o.atr)} em atraso</b>`:""}</small></span><span class="num" style="font-weight:800">${money(o.a+(o.atr||0))}</span></div>`).join("")}</div>`:""}
-    ${linhas.length?`<div class="tw"><table>${head}<tbody>${linhas.map(row).join("")}</tbody><tfoot><tr><td colspan="4">Total ${perDe()} · em aberto ${money(aberto)}</td><td class="r num">${money(tot)}</td><td colspan="2"></td></tr></tfoot></table></div>`:`<p class="note" style="margin:0">Nenhuma parcela a receber em ${perCurto()}.</p>`}
-    ${atraso.length?`<h3 style="margin:18px 0 10px;color:var(--bad)">Em atraso de períodos anteriores · ${money(atr)}</h3><div class="tw"><table>${head}<tbody>${atraso.map(row).join("")}</tbody></table></div>`:""}
+    ${pessoas.length?`<div class="list" style="margin-bottom:10px">${pessoas.map(([k,o])=>`<div class="li"><span class="dd sm" style="color:var(--c-devedor);font-weight:800">${o.n||0}×</span><span class="nm">${esc(k)}<small>${o.n?`${money(o.t)} no período${o.t-o.a>0.004?` · recebido ${money(o.t-o.a)}`:""}`:"nada no período"}${o.atr?` · <b class="neg">${money(o.atr)} em atraso</b>`:""}</small></span><span class="num" style="font-weight:800">${money(o.a+(o.atr||0))}</span></div>`).join("")}</div>`:""}
+    ${pessoas.length?`<p class="note" style="margin:0">Total ${perDe()}: ${money(tot)} · em aberto ${money(aberto)}${atr?` · <b class="neg">${money(atr)} em atraso de períodos anteriores</b>`:""}. Os detalhes de cada parcela ficam em “Ver parcelas”, no card de cada devedor.</p>`:`<p class="note" style="margin:0">Nenhuma parcela a receber em ${perCurto()}.</p>`}
   </div>`;
 }
 function contratoCard(c,r,M){
@@ -1169,12 +1182,32 @@ function invDash(v,r){
 }
 
 /* ============ Categorias ============ */
+/* Gráficos de distribuição: barras ou pizza (escolha lembrada por gráfico) */
+function grafHead(titulo,id,tem){
+  const pz=ui.graf?.[id]==="pizza";
+  return `<div class="ghead"><h3>${esc(titulo)}</h3>${tem?`<div class="gtog" role="group" aria-label="Tipo de gráfico"><button type="button" data-act="graf" data-id="${id}" data-t="barras" class="${pz?"":"on"}" aria-pressed="${!pz}">Barras</button><button type="button" data-act="graf" data-id="${id}" data-t="pizza" class="${pz?"on":""}" aria-pressed="${pz}">Pizza</button></div>`:""}</div>`;
+}
+function distChart(id,itens){
+  if(ui.graf?.[id]==="pizza") return pizzaChart(itens);
+  const max=Math.max(1,...itens.map(i=>i.valor));
+  return `<div class="hbars">${itens.map(i=>`<div class="hb"><span title="${esc(i.nome)}" class="catname"><i style="background:${i.cor}"></i>${esc(i.nome)}</span><span class="t"><span style="width:${i.valor/max*100}%;background:${i.cor}"></span></span><span class="num">${money(i.valor)}</span></div>`).join("")}</div>`;
+}
+function pizzaChart(itens){
+  const tot=sum(itens,i=>i.valor)||1, R=84, r=50, c=90; let a=-Math.PI/2;
+  const pt=(ang,rad)=>`${(c+rad*Math.cos(ang)).toFixed(2)} ${(c+rad*Math.sin(ang)).toFixed(2)}`;
+  const segs=itens.map(i=>{ const f=i.valor/tot; const tt=`<title>${esc(i.nome)}: ${money(i.valor)} (${pctf(f*100,1)})</title>`;
+    if(f>=0.9999) return `<circle cx="${c}" cy="${c}" r="${(R+r)/2}" fill="none" stroke="${i.cor}" stroke-width="${R-r}">${tt}</circle>`;
+    const b=a+f*2*Math.PI, lg=f>0.5?1:0; const d=`M${pt(a,R)}A${R} ${R} 0 ${lg} 1 ${pt(b,R)}L${pt(b,r)}A${r} ${r} 0 ${lg} 0 ${pt(a,r)}Z`; a=b;
+    return `<path d="${d}" style="fill:${i.cor}" stroke="var(--surface)" stroke-width="1.5">${tt}</path>`; }).join("");
+  return `<div class="pie"><svg viewBox="0 0 180 180" role="img" aria-label="Gráfico de pizza">${segs}<text x="90" y="85" text-anchor="middle" class="pt">Total</text><text x="90" y="103" text-anchor="middle" class="pv">${money(tot)}</text></svg>
+    <div class="pleg">${itens.map(i=>`<div><i style="background:${i.cor}"></i><span title="${esc(i.nome)}">${esc(i.nome)}</span><b>${pctf(i.valor/tot*100,1)}</b><small>${money(i.valor)}</small></div>`).join("")}</div></div>`;
+}
 function viewCategorias(){
   const col = (nat,titulo,sub) => { const L=catList(nat); return `<div class="panel"><h3><span class="catdot" style="background:var(--c-${nat})"></span>${titulo}</h3><p class="note" style="margin:-8px 0 14px">${sub}</p>
     <div class="catadd"><input id="nc-${nat}" data-catadd="${nat}" placeholder="Nova categoria" autocomplete="off" aria-label="Nome da nova categoria"><button class="btn pri sm" style="--mc:var(--c-${nat})" data-act="cat-add" data-nat="${nat}">Adicionar</button></div>
-    <div class="catlist">${L.map(c=>{const u=catUso(nat,c.nome);return `<div class="catrow"><span class="sq" style="background:${c.cor}"></span><span class="cn">${esc(c.nome)}<small>${u.n} lançamento(s)${u.mes?` · ${money(u.mes)} em ${ui.per==="ano"?ano():MES_AB[+ui.mes.slice(5,7)-1]}`:""}${c.avulsa?" · fora da lista":""}</small></span>
+    <div class="catlist">${L.map(c=>{return `<div class="catrow"><span class="sq" style="background:${c.cor}"></span><span class="cn">${esc(c.nome)}${c.avulsa?"<small>fora da lista</small>":""}</span>
       <button class="icon-btn" data-act="cat-edit" data-nat="${nat}" data-n="${esc(c.nome)}" title="Editar" aria-label="Editar ${esc(c.nome)}">✎</button><button class="icon-btn" data-act="cat-del" data-nat="${nat}" data-n="${esc(c.nome)}" title="Excluir" aria-label="Excluir ${esc(c.nome)}">✕</button></div>`;}).join("")}</div></div>`; };
-  return `<div class="head"><div><h2><span class="sw">${icon("categorias")}</span>Categorias</h2><p class="sub">Crie, renomeie, troque a cor ou exclua. Renomear atualiza todos os lançamentos.</p></div><div class="row">${monthNav()}${pdfBtn()}</div></div>
+  return `<h3 class="cadsec" id="categorias">${icon("categorias")} Categorias e centros de custo</h3><p class="note" style="margin:-6px 0 14px">Crie, renomeie, troque a cor ou exclua. Renomear atualiza todos os lançamentos.</p>
   <div class="grid2">${col("pagar","Despesas","Usadas em contas a pagar, cartão e contratos")}${col("receber","Receitas","Usadas em contas a receber e devedores")}</div>`;
 }
 function formCategoria(nat,nome){
@@ -1271,7 +1304,7 @@ function viewFluxoMes(){
   const dias = [...Array(nd)].map((_,i)=>{ const d=`${mk}-${pad(i+1)}`; const it=L.filter(e=>e.d===d); const ent=r2(sum(it.filter(e=>e.natureza==="receber"),e=>e.valor)), sai=r2(sum(it.filter(e=>e.natureza==="pagar"),e=>e.valor)); const inicio=acc; acc=r2(acc+ent-sai); return {m:d,ent,sai,res:r2(ent-sai),inicio,fim:acc,it}; });
   const ent=sum(dias,r=>r.ent), sai=sum(dias,r=>r.sai), fim=acc; const menor=dias.reduce((a,r)=>r.fim<a.fim?r:a,dias[0]); const negs=dias.filter(r=>r.fim<0);
   const cats={receber:{},pagar:{}}; L.forEach(e=>{ cats[e.natureza][e.categoria||"Outros"]=(cats[e.natureza][e.categoria||"Outros"]||0)+e.valor; });
-  const catList = nat => Object.entries(cats[nat]).sort((a,b)=>b[1]-a[1]).map(([c,v])=>`<div class="hb"><span class="catname"><i style="background:${catColor(c)}"></i>${esc(c)}</span><span class="t"><span style="width:${(nat==="receber"?ent:sai)?v/(nat==="receber"?ent:sai)*100:0}%;background:${catColor(c)}"></span></span><span class="num">${money(v)}</span></div>`).join("");
+  const catList = nat => { const it=Object.entries(cats[nat]).sort((a,b)=>b[1]-a[1]).map(([c,v])=>({nome:c,valor:v,cor:catColor(c)})); return it.length?distChart("fx"+nat,it):""; };
   const comMov = dias.filter(r=>r.it.length);
   return `
   <div class="head"><div><h2><span class="sw">${icon("fluxo")}</span>Fluxo de caixa</h2><p class="sub">Dia a dia de ${mesNome(mk)}: entradas, saídas e saldo</p></div>
@@ -1289,8 +1322,8 @@ function viewFluxoMes(){
   </div>
   ${negs.length?`<div class="alert"><b>Atenção:</b> o saldo fica negativo a partir de ${dt(negs[0].m).slice(0,5)}. Antecipe recebimentos, adie despesas ou revise o saldo inicial.</div>`:""}
   <div class="panel chart"><h3>Entradas × saídas por dia e saldo</h3>${fluxoChart(dias, d=>String(+d.slice(8,10)), cur)}<div class="legend"><span><i style="background:var(--c-receber)"></i>Entradas</span><span><i style="background:var(--c-pagar)"></i>Saídas</span><span><i style="background:var(--c-fluxo)"></i>Saldo</span></div></div>
-  <div class="grid2"><div class="panel"><h3>Entradas por categoria</h3>${catList("receber")?`<div class="hbars">${catList("receber")}</div>`:`<p class="note">Sem entradas no mês.</p>`}</div>
-    <div class="panel"><h3>Saídas por categoria</h3>${catList("pagar")?`<div class="hbars">${catList("pagar")}</div>`:`<p class="note">Sem saídas no mês.</p>`}</div></div>
+  <div class="grid2"><div class="panel">${grafHead("Entradas por categoria","fxreceber",1)}${catList("receber")||`<p class="note">Sem entradas no mês.</p>`}</div>
+    <div class="panel">${grafHead("Saídas por categoria","fxpagar",1)}${catList("pagar")||`<p class="note">Sem saídas no mês.</p>`}</div></div>
   <div class="panel"><h3>Movimentos dia a dia</h3>
     ${comMov.length?`<div class="tw"><table style="min-width:760px"><thead><tr><th>Dia</th><th>Descrição</th><th>Categoria</th><th>Status</th><th class="r">Entrada</th><th class="r">Saída</th><th class="r">Saldo do dia</th></tr></thead><tbody>
       <tr class="fxsi"><td colspan="6" class="note">Saldo inicial</td><td class="r num">${money(saldoIni)}</td></tr>
@@ -1879,7 +1912,8 @@ function viewCadastro(){
     <div class="panel cadform"><h3>Privacidade</h3><p class="note" style="margin:-6px 0 4px">Seus dados são seus. Você pode baixar uma cópia ou apagar tudo.</p>
       <div class="row"><button class="btn" data-act="backup-json">Baixar meus dados (JSON)</button><button class="btn danger" data-act="conta-excluir">Excluir minha conta</button></div>
       <p class="note" style="margin:0"><a href="manual.pdf" target="_blank" rel="noopener">Manual de uso (PDF)</a> · <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a> · <a href="termos.html" target="_blank" rel="noopener">Termos de uso</a></p><p class="note" style="margin:6px 0 0">© 2026 Yoshizane Gestão e Consultoria Ltda. Todos os direitos reservados. O Money, seu código, telas e manual são protegidos por direitos autorais; é proibido copiá-los, divulgá-los ou usá-los, inclusive por inteligência artificial, para criar sistema igual ou semelhante.</p></div>
-  </div>`;
+  </div>
+  ${viewCategorias()}`;
 }
 async function cadSubmit(form){
   const g=id=>String(form.querySelector("#"+id)?.value||"").trim(); const p=clone(perfil()||{id:PERFIL_ID,tipo:"config"});
@@ -2327,6 +2361,7 @@ document.addEventListener("click", ev=>{
     case "pin-esqueci": closeModal(); formNovoPin(); break;
     case "pin-esqueci-lock": formNovoPin(()=>unlockApp()); break;
     case "conta-excluir": formExcluirConta(); break;
+    case "graf": { ui.graf={...(ui.graf||{}),[b.dataset.id]:b.dataset.t}; try{localStorage.setItem(LSKEY+":graf",JSON.stringify(ui.graf));}catch(e){} render(); break; }
     case "ord": { const k=b.dataset.k; const o=ui.ord||{k:"venc",d:1}; ui.ord = o.k===k ? {k,d:-o.d} : {k,d:(k==="valor"?-1:1)}; try{localStorage.setItem(LSKEY+":ord",JSON.stringify(ui.ord));}catch(e){} render(); break; }
     case "adm-recarregar": adminLista=null; render(); break;
     case "adm-tg": (async()=>{ const on=b.dataset.on==="1"; const {error}=await sb.rpc("admin_telegram",{p_email:b.dataset.email,p_liberar:on}); toast(error?"Não foi possível alterar.":on?"Telegram liberado.":"Telegram retirado."); adminLista=null; render(); })(); break;
