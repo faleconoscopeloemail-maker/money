@@ -647,6 +647,8 @@ function status(e){
   return ["aberto","Em aberto"];
 }
 /* Une todos os lançamentos (avulsos, cartão, parcelas de contratos, investimentos) */
+/* Aquisições começam fora de contas/fluxo (comFluxo liga); os demais começam dentro (semFluxo desliga) */
+const foraFluxo = c => c.modalidade==="aquisicao" ? !c.comFluxo : !!c.semFluxo;
 function allEntries(opt={}){
   const out=[]; const fat=new Map();
   for (const r of recs.values()){
@@ -659,7 +661,7 @@ function allEntries(opt={}){
         detalhe: (r.parte?r.parte+" · ":"")+(card ? `${cardNameOf(r)} · ${condTxt(r)}` : (r.totalParcelas>1?`${condTxt(r)} · ${r.forma||""}`:(r.forma||"")))+(r.editado?" · alterado neste mês":""),
         categoria:r.categoria||"Outros", classe:r.classe||"variavel", valor:r.valor, venc:r.vencimento, pago:!!r.pago, dataPag:r.dataPagamento, editavel:true, card});
     } else if (r.tipo==="contrato"){
-      const M = MODS[r.modalidade]; if(!M) continue; const fora = r.modalidade==="aquisicao" || !!r.semFluxo; if(fora && !opt.todos) continue; /* aquisições e contratos desmarcados ficam só na aba deles */
+      const M = MODS[r.modalidade]; if(!M) continue; const fora = foraFluxo(r); if(fora && !opt.todos) continue; /* contratos desmarcados ficam só na aba deles */
       (r.parcelas||[]).forEach((p,idx)=>out.push({key:`c:${r.id}:${idx}`, id:r.id, origem:r.modalidade, natureza:M.nat,
         descricao:r.nome, detalhe:`${r.parte?r.parte+" · ":""}parcela ${p.n}/${r.parcelas.length}${p.ajustado?" · valor ajustado":""}`, categoria:r.categoria||M.sing, classe:"fixa",
         valor:p.valor, venc:p.venc, pago:!!p.pago, dataPag:p.dataPag, idx, fora}));
@@ -896,7 +898,7 @@ function viewContratos(mod){
   const cs = byTipo("contrato").filter(c=>c.modalidade===mod).sort((a,b)=>(a.nome||"").localeCompare(b.nome||"","pt-BR",{numeric:true}));
   const rs = cs.map(resumoContrato);
   return `
-  <div class="head"><div><h2><span class="sw">${icon(ui.view)}</span>${M.label}</h2><p class="sub">${mod==="aquisicao"?"Controle só nesta aba — não entra em contas nem no fluxo de caixa":"Em cada contrato você escolhe se as parcelas entram em contas a "+M.nat+" e no fluxo de caixa"}</p></div>
+  <div class="head"><div><h2><span class="sw">${icon(ui.view)}</span>${M.label}</h2><p class="sub">${"Em cada registro você escolhe se as parcelas entram em contas a "+M.nat+" e no fluxo. Ao "+(M.nat==="pagar"?"pagar":"receber")+" lá, este card atualiza sozinho."}</p></div>
     <div class="row">${monthNav()}${pdfBtn()}<button class="btn pri" data-act="novo-contrato" data-mod="${mod}">+ ${rec?"Novo devedor":"Novo "+M.sing.toLowerCase()}</button></div></div>
   <div class="kpis">
     <div class="kpi" style="--kc:var(--mc)"><span class="l">${rec?"Total emprestado/vendido":"Total contratado"}</span><span class="v">${money(sum(cs,c=>principal(c)))}</span><span class="d">${cs.length} registro(s)</span></div>
@@ -939,7 +941,7 @@ function contratoCard(c,r,M){
   const sis = {price:"Price (parcelas iguais)",sac:"SAC (amortização constante)",sem:"Sem juros"}[c.sistema]||"";
   const prog = r.n?r.nPagas/r.n*100:0;
   return `<div class="ccard ${open?"wide":""}" id="ct-${c.id}">
-    <div class="row" style="justify-content:space-between;align-items:flex-start"><div style="min-width:0"><h4>${esc(c.nome)}</h4><div class="who">${esc(c.parte||"")}${c.objeto?" · "+esc(c.objeto):""}</div>${c.semFluxo&&c.modalidade!=="aquisicao"?`<span class="tick more" style="margin-top:6px" title="Não entra em contas a ${MODS[c.modalidade].nat} nem no fluxo">Fora de contas e fluxo</span>`:""}</div>
+    <div class="row" style="justify-content:space-between;align-items:flex-start"><div style="min-width:0"><h4>${esc(c.nome)}</h4><div class="who">${esc(c.parte||"")}${c.objeto?" · "+esc(c.objeto):""}</div>${foraFluxo(c)?`<span class="tick more" style="margin-top:6px" title="Não entra em contas a ${MODS[c.modalidade].nat} nem no fluxo">Fora de contas e fluxo</span>`:""}</div>
       ${r.vencidas?`<span class="pill st-vencido">${r.vencidas} vencida(s)</span>`:r.aberto===0&&r.n?`<span class="pill st-pago">${rec?"Recebido":"Quitado"}</span>`:""}</div>
     <div class="row" style="gap:6px"><span class="chip" style="--cc:var(--mc)">${sis}</span>${c.categoria?`<span class="chip" style="--cc:${catColor(c.categoria)}">${esc(c.categoria)}</span>`:""}${(c.parcelas||[]).some(p=>p.ajustado)?`<span class="chip" style="--cc:var(--c-cartao)">${c.parcelas.filter(p=>p.ajustado).length} parcela(s) ajustada(s)</span>`:""}${c.sistema!=="sem"?`<span class="chip" style="--cc:var(--warn)">${pctf(taxaM,2)} a.m.${c.taxaCalculada?" (calculada)":""}</span>`:""}</div>
     <div class="facts">
@@ -1647,7 +1649,7 @@ function sha256Hex(bytes){ // reserva para quando o navegador não oferece crypt
     H=H.map((v,i)=>(v+[a,b,c,d,e,f,g,h].at(i))|0); }
   return H.map(v=>(v>>>0).toString(16).padStart(8,"0")).join("");
 }
-const pinAtivo = () => { const p=perfil(); return !!(p && p.pinHash && !p.pinLivre); };
+const pinAtivo = () => false; /* senha rápida removida: compromissos e patrimônio sempre livres */
 async function pinOk(pin){ const p=perfil(); if(!p||!p.pinHash) return false; return (await hashPin(pin,p.salt))===p.pinHash; }
 const soDig = v => String(v||"").replace(/\D/g,"");
 function fmtCPF(v){ const d=soDig(v).slice(0,11); return d.replace(/(\d{3})(\d)/,"$1.$2").replace(/(\d{3})(\d)/,"$1.$2").replace(/(\d{3})(\d{1,2})$/,"$1-$2"); }
@@ -1655,11 +1657,11 @@ function fmtTel(v){ const d=soDig(v).slice(0,11); if(d.length<=10) return d.repl
 function cpfValido(v){ const c=soDig(v); if(c.length!==11||/^(\d)\1+$/.test(c)) return false;
   const dv=n=>{ let s=0; for(let i=0;i<n;i++) s+=+c[i]*(n+1-i); const r=(s*10)%11; return r===10?0:r; }; return dv(9)===+c[9] && dv(10)===+c[10]; }
 const pinInp = (id,ph="••••") => `<input id="${id}" name="${id}" class="pin" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="one-time-code" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore data-form-type="other" placeholder="${ph}">`;
-const pwInp = (id,ac="current-password") => `<input id="${id}" name="${id}" type="password" autocomplete="${ac}" minlength="8">`;
+const pwInp = (id,ac="current-password") => `<input id="${id}" name="${id}" type="password" autocomplete="${ac}" minlength="6">`;
 const emailOk = v => /^\S+@\S+\.\S+$/.test(v);
 const traduzErro = e => { const m=String(e&&e.message||e||""); if(/Invalid login credentials/i.test(m)) return "E-mail ou senha incorretos."; if(/Email not confirmed/i.test(m)) return "Confirme seu e-mail antes de entrar (veja sua caixa de entrada e o spam).";
-  if(/already registered|already exists/i.test(m)) return "Já existe uma conta com esse e-mail. Entre ou use “Esqueci minha senha”."; if(/Password should be/i.test(m)) return "A senha precisa ter pelo menos 8 caracteres.";
-  if(/rate limit|too many/i.test(m)) return "Muitas tentativas. Aguarde alguns minutos."; if(/network|fetch/i.test(m)) return "Sem conexão com o servidor. Verifique sua internet."; return "Não foi possível concluir: "+m; };
+  if(/already registered|already exists/i.test(m)) return "Já existe uma conta com esse e-mail. Entre ou use “Esqueci minha senha”."; if(/Password should be/i.test(m)) return "A senha precisa ter pelo menos 6 caracteres.";
+  if(/email rate limit|over_email_send_rate/i.test(m)) return "O sistema atingiu o limite de envio de e-mails por hora. Tente de novo mais tarde."; if(/rate limit|too many/i.test(m)) return "Muitas tentativas em pouco tempo. Aguarde alguns minutos."; if(/network|fetch/i.test(m)) return "Sem conexão com o servidor. Verifique sua internet."; return "Não foi possível concluir: "+m; };
 
 /* --- Supabase: dados de cada usuário --- */
 let sb = null, sessao = null, uidAtual = null, canal = null;
@@ -1680,15 +1682,18 @@ function assinarRealtime(){
 }
 async function initStore(){
   if(!configOk()){ ui.lk="config"; storeReady=true; render(); return; }
+  try{ const h=new URLSearchParams((location.hash||"").replace(/^#/,"")+"&"+(location.search||"").replace(/^\?/,"")); const ec=h.get("error_code")||h.get("error");
+    if(ec){ ui.lkAviso = /expired|otp/i.test(ec+(h.get("error_description")||"")) ? "Esse link expirou ou já foi usado. Peça um novo abaixo e clique só no e-mail mais recente, uma única vez." : "Não foi possível usar esse link. Peça um novo abaixo."; history.replaceState(null,"",location.pathname); }
+  }catch(e){}
   sb = window.supabase.createClient(MONEY_CONFIG.supabaseUrl, MONEY_CONFIG.supabaseAnonKey, {auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
   sb.auth.onAuthStateChange((ev,s)=>{
     if(ev==="PASSWORD_RECOVERY"){ sessao=s; ui.lk="nova-senha"; ui.auth=false; lockState=""; storeReady=true; render(); return; }
     if(ev==="SIGNED_OUT"){ sairLimpo(); return; }
-    if(ev==="SIGNED_IN" && s && (!uidAtual || uidAtual!==s.user.id) && ui.lk!=="nova-senha") setTimeout(()=>entrarComSessao(s),0);
+    if(ev==="SIGNED_IN" && s && (!uidAtual || uidAtual!==s.user.id) && ui.lk!=="nova-senha" && ui.lk!=="codigo") setTimeout(()=>entrarComSessao(s),0);
   });
   const {data} = await sb.auth.getSession();
   if(ui.lk==="nova-senha") return;
-  if(data && data.session) await entrarComSessao(data.session); else { storeReady=true; ui.lk="login"; render(); }
+  if(data && data.session) await entrarComSessao(data.session); else { storeReady=true; ui.lk = ui.lkAviso ? "esqueci" : "login"; render(); }
 }
 let entrando=null;
 function entrarComSessao(s){ if(entrando && uidAtual===s.user.id) return entrando; entrando=entrar(s).finally(()=>{ entrando=null; }); return entrando; }
@@ -1718,15 +1723,18 @@ function lockHtml(){
       <h2>Criar conta</h2><p class="note">Grátis. Seus dados ficam visíveis só para você.</p>
       <div class="fg">${fld("cd_nome","Nome completo",inp("cd_nome","",'autocomplete="name"'))}${fld("cd_email","E-mail",inp("cd_email","",'type="email" autocomplete="email"'))}</div>
       <div class="fg">${fld("cd_tel","Telefone (opcional)",inp("cd_tel","",'inputmode="tel" placeholder="(11) 99999-9999" autocomplete="tel"'))}${fld("cd_cpf","CPF (opcional)",inp("cd_cpf","",'inputmode="numeric" placeholder="000.000.000-00"'))}</div>
-      <div class="fg">${fld("cd_pw","Senha da conta",pwInp("cd_pw","new-password"),"Mínimo de 8 caracteres.")}${fld("cd_pw2","Confirme a senha",pwInp("cd_pw2","new-password"))}</div>
-      <div class="fg">${fld("cd_pin","Senha rápida (opcional)",pinInp("cd_pin"),"4 números, pedida para abrir Compromissos e Patrimônio. Em branco = acesso livre; dá para criar depois em Meu cadastro.")}${fld("cd_pin2","Confirme",pinInp("cd_pin2"))}</div>
+      <div class="fg">${fld("cd_pw","Senha da conta",pwInp("cd_pw","new-password"),"Mínimo de 6 caracteres.")}${fld("cd_pw2","Confirme a senha",pwInp("cd_pw2","new-password"))}</div>
       <label class="chk"><input type="checkbox" id="cd_ok"> Li e aceito os <a href="termos.html" target="_blank" rel="noopener">Termos de uso</a> e a <a href="privacidade.html" target="_blank" rel="noopener">Política de privacidade</a></label>
       ${err}<button class="btn pri lk-btn" type="submit">Criar conta</button><button class="btn ghost sm" type="button" data-act="lk-ir" data-k="login" style="align-self:center">Já tenho conta — entrar</button>${foot}</form>`};
   if(k==="confirmar") return {k,h:`${head}<div class="lk-card"><h2>Confirme seu e-mail</h2><p class="note">Enviamos um link para <b>${esc(ui.lkEmail||"")}</b>. Abra o e-mail (veja também o spam), clique no link e depois volte aqui para entrar.</p><button class="btn pri lk-btn" type="button" data-act="lk-ir" data-k="login">Ir para o login</button></div>`};
-  if(k==="esqueci") return {k,h:`${head}<form class="lk-card" id="lkform" data-lk="esqueci" novalidate><h2>Esqueci minha senha</h2><p class="note">Informe o e-mail da conta. Enviaremos um link para criar uma nova senha.</p>
+  if(k==="esqueci") return {k,h:`${head}<form class="lk-card" id="lkform" data-lk="esqueci" novalidate><h2>Esqueci minha senha</h2>${ui.lkAviso?`<p class="lk-err" style="color:var(--warn)">${esc(ui.lkAviso)}</p>`:""}<p class="note">Informe o e-mail da conta. Enviaremos um <b>link</b> para você criar uma nova senha.</p>
       ${fld("es_email","E-mail",inp("es_email",ui.lkEmail||"",'type="email" autocomplete="email"'))}${err}<button class="btn pri lk-btn" type="submit">Enviar link</button><button class="btn ghost sm" type="button" data-act="lk-ir" data-k="login" style="align-self:center">Voltar ao login</button></form>`};
+  if(k==="codigo") return {k,h:`${head}<div class="lk-card"><h2>Confira seu e-mail</h2><p class="note">Enviamos um link para <b>${esc(ui.lkEmail||"")}</b> (veja também o spam e promoções).</p>
+      <ol class="note" style="margin:0;padding-left:18px;line-height:1.6"><li>Abra o e-mail <b>mais recente</b> do Money.</li><li>Clique em <b>Reset password</b> uma única vez, de preferência <b>neste mesmo aparelho e navegador</b>.</li><li>O Money abre na tela de nova senha. Crie a senha e pronto.</li></ol>
+      <p class="note" style="margin:0">O link vale por 1 hora. Se pedir de novo, só o último e-mail funciona.</p>
+      <div class="row" style="justify-content:center;gap:6px"><button class="btn ghost sm" type="button" data-act="lk-ir" data-k="esqueci">Reenviar link</button><button class="btn ghost sm" type="button" data-act="lk-ir" data-k="login">Voltar ao login</button></div></div>`};
   if(k==="nova-senha") return {k,h:`${head}<form class="lk-card" id="lkform" data-lk="nova-senha" novalidate><h2>Nova senha</h2><p class="note">Crie a nova senha da sua conta.</p>
-      <div class="fg">${fld("ns_pw","Nova senha",pwInp("ns_pw","new-password"),"Mínimo de 8 caracteres.")}${fld("ns_pw2","Confirme",pwInp("ns_pw2","new-password"))}</div>${err}<button class="btn pri lk-btn" type="submit">Salvar e entrar</button></form>`};
+      <div class="fg">${fld("ns_pw","Nova senha",pwInp("ns_pw","new-password"),"Mínimo de 6 caracteres.")}${fld("ns_pw2","Confirme",pwInp("ns_pw2","new-password"))}</div>${err}<button class="btn pri lk-btn" type="submit">Salvar e entrar</button></form>`};
   if(k==="pin"){ const p=perfil()||{}; return {k,h:`${head}<form class="lk-card" id="lkform" data-lk="pin" novalidate><h2>Olá${p.nome?", "+esc(p.nome.split(" ")[0]):""}</h2><p class="note">O Money foi bloqueado por inatividade. Digite sua senha de 4 números.</p>
       <div class="f">${pinInp("lg_pin")}</div>${err}<button class="btn pri lk-btn" type="submit">Desbloquear</button><div class="row" style="justify-content:space-between"><button class="btn ghost sm" type="button" data-act="pin-esqueci-lock">Esqueci a senha rápida</button><button class="btn ghost sm" type="button" data-act="lk-sair-conta">Sair da conta</button></div></form>`}; }
   return {k:"login",h:`${head}<form class="lk-card" id="lkform" data-lk="login" novalidate><h2>Entrar</h2><p class="note">Controle de contas, cartões, compromissos e investimentos.</p>
@@ -1765,13 +1773,20 @@ async function lockSubmit(form){
   if(t==="pin"){ const m=await tentarPin(g("lg_pin")); if(m){ err.textContent=m; const i=$("#lg_pin"); i.value=""; i.focus(); return; } unlockApp(); return; }
   if(t==="esqueci"){ const email=g("es_email"); if(!emailOk(email)){ err.textContent="Informe um e-mail válido."; return; } ui.lkEmail=email;
     const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname}); if(error){ err.textContent=traduzErro(error); return; }
-    err.style.color="var(--ok)"; err.textContent="Pronto. Se existir uma conta com esse e-mail, o link chega em alguns minutos."; return; }
+    ui.lkAviso=""; ui.lk="codigo"; lockState=""; render(); return; }
+  if(t==="codigo"){ const cod=g("rc_cod").replace(/\D/g,""), a=form.querySelector("#rc_pw").value, b=form.querySelector("#rc_pw2").value;
+    if(cod.length<6){ err.textContent="Digite o código que chegou no e-mail."; return; }
+    if(a.length<6){ err.textContent="A senha precisa ter pelo menos 6 caracteres."; return; } if(a!==b){ err.textContent="As senhas não conferem."; return; }
+    const {data,error}=await sb.auth.verifyOtp({email:ui.lkEmail,token:cod,type:"recovery"});
+    if(error){ err.textContent=/expired|invalid/i.test(error.message||"")?"Código inválido ou vencido. Toque em “Reenviar código”.":traduzErro(error); return; }
+    const up=await sb.auth.updateUser({password:a}); if(up.error){ err.textContent=traduzErro(up.error); return; }
+    toast("Senha alterada. Bem-vindo de volta!"); ui.lk="login"; if(data.session) await entrarComSessao(data.session); else render(); return; }
   if(t==="nova-senha"){ const a=form.querySelector("#ns_pw").value, b=form.querySelector("#ns_pw2").value;
-    if(a.length<8){ err.textContent="A senha precisa ter pelo menos 8 caracteres."; return; } if(a!==b){ err.textContent="As senhas não conferem."; return; }
+    if(a.length<6){ err.textContent="A senha precisa ter pelo menos 6 caracteres."; return; } if(a!==b){ err.textContent="As senhas não conferem."; return; }
     const {error}=await sb.auth.updateUser({password:a}); if(error){ err.textContent=traduzErro(error); return; }
     history.replaceState(null,"",location.pathname); toast("Senha alterada."); const {data}=await sb.auth.getSession(); ui.lk="login"; if(data.session) await entrarComSessao(data.session); else render(); return; }
   if(t==="cadastro"){ const nome=g("cd_nome"), email=g("cd_email"), tel=g("cd_tel"), cpf=g("cd_cpf"), pw=form.querySelector("#cd_pw").value, pw2=form.querySelector("#cd_pw2").value, pin=g("cd_pin"), pin2=g("cd_pin2");
-    const falha = !nome?"Informe seu nome.":!emailOk(email)?"Informe um e-mail válido.":(tel&&soDig(tel).length<10)?"Telefone incompleto (inclua o DDD).":(cpf&&!cpfValido(cpf))?"CPF inválido. Confira os números ou deixe em branco.":pw.length<8?"A senha da conta precisa ter pelo menos 8 caracteres.":pw!==pw2?"As senhas da conta não conferem.":(pin||pin2)&&!/^\d{4}$/.test(pin)?"A senha rápida deve ter 4 números (ou deixe os dois campos em branco).":pin!==pin2?"As senhas rápidas não conferem.":!$("#cd_ok").checked?"Para criar a conta, aceite os Termos e a Política de privacidade.":"";
+    const falha = !nome?"Informe seu nome.":!emailOk(email)?"Informe um e-mail válido.":(tel&&soDig(tel).length<10)?"Telefone incompleto (inclua o DDD).":(cpf&&!cpfValido(cpf))?"CPF inválido. Confira os números ou deixe em branco.":pw.length<6?"A senha da conta precisa ter pelo menos 6 caracteres.":pw!==pw2?"As senhas da conta não conferem.":(pin||pin2)&&!/^\d{4}$/.test(pin)?"A senha rápida deve ter 4 números (ou deixe os dois campos em branco).":pin!==pin2?"As senhas rápidas não conferem.":!$("#cd_ok").checked?"Para criar a conta, aceite os Termos e a Política de privacidade.":"";
     if(falha){ err.textContent=falha; return; }
     const salt=uid("s"); const pinHash=pin?await hashPin(pin,salt):""; ui.lkEmail=email;
     const {data,error}=await sb.auth.signUp({email,password:pw,options:{emailRedirectTo:location.origin+location.pathname,data:{nome,telefone:tel?fmtTel(tel):"",cpf:cpf?fmtCPF(cpf):"",salt,pinHash,aceite:new Date().toISOString()}}});
@@ -1851,20 +1866,15 @@ function viewUsuarios(){
 }
 function viewCadastro(){
   const p=perfil()||{}; const email=sessao?.user?.email||p.email||"";
-  return `<div class="head"><div><h2><span class="sw">${icon("cadastro")}</span>Meu cadastro</h2><p class="sub">Seus dados, senhas e privacidade</p></div><div class="row"><a class="btn" href="manual.pdf" target="_blank" rel="noopener" style="text-decoration:none">📘 Manual de uso</a>${pinAtivo()?`<button class="btn" data-act="lk-sair">Bloquear</button>`:""}<button class="btn" data-act="lk-sair-conta">Sair da conta</button></div></div>
+  return `<div class="head"><div><h2><span class="sw">${icon("cadastro")}</span>Meu cadastro</h2><p class="sub">Seus dados, senha e privacidade</p></div><div class="row"><a class="btn" href="manual.pdf" target="_blank" rel="noopener" style="text-decoration:none">📘 Manual de uso</a>${pinAtivo()?`<button class="btn" data-act="lk-sair">Bloquear</button>`:""}<button class="btn" data-act="lk-sair-conta">Sair da conta</button></div></div>
   <div class="grid2">
     <form class="panel cadform" id="cadform" novalidate><h3>Dados pessoais</h3>
       <div class="fg">${fld("pf_nome","Nome completo",inp("pf_nome",p.nome))}${fld("pf_email","E-mail (login)",inp("pf_email",email,'type="email" readonly'))}</div>
       <div class="fg">${fld("pf_tel","Telefone (opcional)",inp("pf_tel",p.telefone,'inputmode="tel"'))}${fld("pf_cpf","CPF (opcional)",inp("pf_cpf",p.cpf,'inputmode="numeric"'))}</div>
       <p class="lk-err" id="pferr"></p><div><button class="btn pri" type="submit" style="--mc:var(--accent)">Salvar dados</button></div></form>
     <form class="panel cadform" id="pwform" novalidate><h3>Senha da conta</h3><p class="note" style="margin:-6px 0 12px">Usada para entrar com o e-mail.</p>
-      <div class="fg">${fld("pw_nova","Nova senha",pwInp("pw_nova","new-password"),"Mínimo de 8 caracteres.")}${fld("pw_nova2","Confirme",pwInp("pw_nova2","new-password"))}</div>
+      <div class="fg">${fld("pw_nova","Nova senha",pwInp("pw_nova","new-password"),"Mínimo de 6 caracteres.")}${fld("pw_nova2","Confirme",pwInp("pw_nova2","new-password"))}</div>
       <p class="lk-err" id="pwerr"></p><div><button class="btn pri" type="submit" style="--mc:var(--accent)">Alterar senha da conta</button></div></form>
-    <form class="panel cadform" id="pinform" novalidate><h3>Senha rápida (4 números)</h3>
-      <div class="f"><span class="lb">Compromissos e Patrimônio</span>${seg("pin_modo",[["ativa","Pedir senha rápida"],["livre","Acesso livre"]],pinAtivo()?"ativa":"livre")}</div>
-      <p class="note" style="margin:-4px 0 12px">${pinAtivo()?"A senha rápida é pedida para abrir Compromissos e Patrimônio e para desbloquear após 15 min sem uso.":p.pinHash?"Acesso livre: nada pede a senha rápida. Para voltar a pedir, marque “Pedir senha rápida” (sua senha atual continua guardada).":"Acesso livre. Para proteger Compromissos e Patrimônio, crie uma senha rápida abaixo."}</p>
-      <div class="fg">${p.pinHash?fld("ps_atual","Senha rápida atual",pinInp("ps_atual")):""}${fld("ps_nova","Nova",pinInp("ps_nova"))}${fld("ps_nova2","Confirme",pinInp("ps_nova2"))}</div>
-      <p class="lk-err" id="pserr"></p><div><button class="btn pri" type="submit" style="--mc:var(--accent)">${p.pinHash?"Alterar":"Criar"} senha rápida</button></div></form>
     ${tgCard()}
     <div class="panel cadform"><h3>Privacidade</h3><p class="note" style="margin:-6px 0 4px">Seus dados são seus. Você pode baixar uma cópia ou apagar tudo.</p>
       <div class="row"><button class="btn" data-act="backup-json">Baixar meus dados (JSON)</button><button class="btn danger" data-act="conta-excluir">Excluir minha conta</button></div>
@@ -1877,7 +1887,7 @@ async function cadSubmit(form){
     const f=!nome?"Informe seu nome.":(tel&&soDig(tel).length<10)?"Telefone incompleto (inclua o DDD).":(cpf&&!cpfValido(cpf))?"CPF inválido.":""; if(f){e.textContent=f;return;}
     Object.assign(p,{nome,telefone:tel?fmtTel(tel):"",cpf:cpf?fmtCPF(cpf):""}); saveRec(p); e.textContent=""; toast("Dados salvos."); return; }
   if(form.id==="pwform"){ const e=$("#pwerr"); const a=form.querySelector("#pw_nova").value, b=form.querySelector("#pw_nova2").value;
-    if(a.length<8){e.textContent="Mínimo de 8 caracteres.";return;} if(a!==b){e.textContent="As senhas não conferem.";return;}
+    if(a.length<6){e.textContent="Mínimo de 6 caracteres.";return;} if(a!==b){e.textContent="As senhas não conferem.";return;}
     const {error}=await sb.auth.updateUser({password:a}); if(error){ e.textContent=traduzErro(error); return; } form.reset(); e.textContent=""; toast("Senha da conta alterada."); return; }
   const e=$("#pserr"); if(p.pinHash){ const m=await tentarPin(g("ps_atual")); if(m){ e.textContent=m.replace("Senha incorreta","Senha rápida atual incorreta"); return; } }
   const n=g("ps_nova"); if(!/^\d{4}$/.test(n)){e.textContent="A senha rápida deve ter 4 números.";return;} if(n!==g("ps_nova2")){e.textContent="As senhas não conferem.";return;}
@@ -1946,7 +1956,7 @@ function formContrato(mod,id){
       ${fld("parte",M.parte,inp("parte",c?.parte,`placeholder="${M.parteHint}" autocomplete="off"`))}</div>
     <div class="fg">${fld("objeto",M.obj,inp("objeto",c?.objeto,`placeholder="${M.objHint}" autocomplete="off"`))}
       ${fld("categoria","Categoria",catSelect("categoria",M.nat,c?.categoria||"",`Padrão (${M.sing})`),"Aparece em contas a "+M.nat+" e nos relatórios.")}</div>
-    ${mod==="aquisicao"?"":`<div class="escopo"><label class="chk" style="padding:0;color:var(--fg);font-weight:600"><input type="checkbox" name="entraFluxo" ${c?.semFluxo?"":"checked"}> Lançar as parcelas em contas a ${M.nat} e no fluxo de caixa</label><span class="hint">Desmarcado: o contrato fica só nesta aba e não entra nos totais de contas a ${M.nat} nem do fluxo.</span></div>`}
+    <div class="escopo"><label class="chk" style="padding:0;color:var(--fg);font-weight:600"><input type="checkbox" name="entraFluxo" ${(c?!foraFluxo(c):mod!=="aquisicao")?"checked":""}> Lançar as parcelas em contas a ${M.nat} e no fluxo de caixa</label><span class="hint">Marcado: cada parcela aparece em contas a ${M.nat} ligada a este registro — ao marcar como ${M.nat==="pagar"?"paga":"recebida"} lá (ou aqui), o card atualiza. Desmarcado: fica só nesta aba.</span></div>
     <div class="sectitle">Valores</div>
     <div class="fg">${fld("valorTotal",rec?"Valor devido (R$)":"Valor total do bem / contrato (R$)",moneyInp("valorTotal",c?.valorTotal))}
       ${fld("entrada","Entrada (R$)",moneyInp("entrada",c?.entrada),rec?"Valor que já foi pago de início, se houver.":"Abatida do valor financiado.")}</div>
@@ -1983,7 +1993,7 @@ function formContrato(mod,id){
       if(!(principal(d)>0)){toast("O valor precisa ser maior que a entrada.");return;}
       const cat = catValue(fd,"categoria",M.nat,""); if(cat===null) return; d.categoria = cat;
       d.parcelas = gerarParcelas(d,c?.parcelas);
-      saveRec(d); ui.view=mod; ui.open.add(d.id); toast(c?"Registro atualizado e parcelas recalculadas.":(mod==="aquisicao"||d.semFluxo)?`${d.parcelas.length} parcela(s) geradas nesta aba.`:`${d.parcelas.length} parcela(s) geradas em contas a ${M.nat}.`); closeModal();
+      saveRec(d); ui.view=mod; ui.open.add(d.id); toast(c?"Registro atualizado e parcelas recalculadas.":foraFluxo(d)?`${d.parcelas.length} parcela(s) geradas nesta aba.`:`${d.parcelas.length} parcela(s) geradas em contas a ${M.nat}.`); closeModal();
     }});
 }
 function contratoFromForm(fd,mod,c){
@@ -1992,7 +2002,7 @@ function contratoFromForm(fd,mod,c){
   return {...(c||{}), id:c?.id||uid("c"), tipo:"contrato", modalidade:mod, nome:String(fd.get("nome")||"").trim(), parte:String(fd.get("parte")||"").trim(), objeto:String(fd.get("objeto")||"").trim(),
     valorTotal:r2(parseMoney(fd.get("valorTotal"))), entrada:r2(parseMoney(fd.get("entrada"))), nParcelas:parseInt(fd.get("nParcelas"))||1, primeiroVenc:fd.get("primeiroVenc")||todayStr(),
     jaPagas:parseInt(fd.get("jaPagas"))||0, sistema:fd.get("sistema")||"price", taxa:parseMoney(fd.get("taxa")), taxaPeriodo:fd.get("taxaPeriodo")||"am",
-    parcelaInformada:r2(parseMoney(fd.get("parcelaInformada"))), taxas, obs:fd.get("obs")||"", semFluxo: mod!=="aquisicao" && !fd.get("entraFluxo")};
+    parcelaInformada:r2(parseMoney(fd.get("parcelaInformada"))), taxas, obs:fd.get("obs")||"", semFluxo: mod!=="aquisicao" && !fd.get("entraFluxo"), comFluxo: mod==="aquisicao" && !!fd.get("entraFluxo")};
 }
 
 /* --- Investimentos --- */
