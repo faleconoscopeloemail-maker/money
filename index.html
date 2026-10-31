@@ -194,6 +194,18 @@ tfoot td{font-weight:700;background:var(--surface-2)}
 .legend span{display:inline-flex;align-items:center;gap:6px}
 .legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
 .hbars{display:flex;flex-direction:column;gap:12px}
+.mcards-w{margin:0 0 14px;display:flex;flex-direction:column;gap:12px;align-items:flex-start}
+.mcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;width:100%;align-items:start}
+.mcard{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 12px;display:flex;flex-direction:column;gap:6px;font-size:12.5px;box-shadow:var(--shadow);min-width:0}
+.mcard.late{border-color:color-mix(in srgb,var(--bad) 45%,var(--line))}.mcard.open{grid-column:span 2}
+.mc-top{display:flex;gap:6px;align-items:center;justify-content:space-between}.mc-top b{font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mc-who{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mcard .bar{height:5px}.mc-l{display:flex;justify-content:space-between;gap:8px;color:var(--muted)}.mc-l b{color:var(--fg);font-variant-numeric:tabular-nums}.mc-l .neg{color:var(--bad);font-weight:700}
+.mcard .lnk{border:0;background:none;color:var(--mc,var(--accent));font:inherit;font-weight:700;cursor:pointer;padding:0}
+.mc-ps{display:flex;flex-direction:column;border-top:1px solid var(--line);margin-top:4px}
+.mc-ps div{display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--line)}.mc-ps div:last-child{border-bottom:0}.mc-ps .is-pago{color:var(--muted)}
+.mc-ps .pay.sm{padding:3px 9px;font-size:11.5px}
+@media (max-width:560px){.mcard.open{grid-column:auto}}
 table.dre{min-width:640px}table.dre td,table.dre th{padding:9px 10px;white-space:nowrap}
 table.dre.anual{min-width:1100px;font-size:12.5px}table.dre.anual td,table.dre.anual th{padding:8px 7px}
 table.dre.anual td:first-child,table.dre.anual th:first-child{position:sticky;left:0;background:var(--surface);z-index:1}
@@ -756,7 +768,7 @@ function renderSide(){
       <button class="nav ${ui.view===k?"on":""}" data-act="view" data-v="${k}" style="--mc:var(${c})"><span class="ico">${icon(k)}</span>${l}${PROTEGIDAS.has(k)&&pinAtivo()&&!(ui.sec&&ui.view===k)?`<span class="lk-i" title="Protegido por senha">${icon("lock")}</span>`:""}${counts[k]?`<span class="cnt" title="vencidos">${counts[k]}</span>`:""}</button>`).join("")}</div>`).join("")}
     <div class="sidefoot">
       <div class="sync cloud"><i></i>Sincronizado${sessao?.user?.email?` · ${esc(sessao.user.email)}`:""}</div>
-      <small style="color:var(--side-muted);font-size:11px;padding:0 12px">Versão 15 · 31/10/2026</small>
+      <small style="color:var(--side-muted);font-size:11px;padding:0 12px">Versão 16 · 31/10/2026</small>
       <a class="btn sm ghost" href="manual.pdf" target="_blank" rel="noopener" style="text-decoration:none">📘 Manual de uso</a>
       <button class="btn sm ghost" data-act="backup-json">Baixar backup (JSON)</button>
       <button class="btn sm ghost" data-act="backup-csv">Exportar lançamentos (CSV)</button>
@@ -940,35 +952,31 @@ function viewLista(nat){
     </select>
     <label class="chk"><input type="checkbox" id="f-todos" data-filter="todos" ${ui.todos?"checked":""}> Todos os meses</label>
   </div>
-  ${lembreteCards(nat)}
+  ${contasCards(nat)}
   ${tabelaEntries(L,nat)}`;
 }
-/* Cards de acompanhamento dos lançamentos "só lembrete" (fora do fluxo e da DRE), agrupados por parcelamento */
-function lembreteCards(nat){
-  const G=new Map(); byTipo("lanc").filter(r=>r.natureza===nat && r.foraFluxo && !isCard(r)).forEach(r=>{ const k=r.grupo||r.id; (G.get(k)||G.set(k,[]).get(k)).push(r); });
-  if(!G.size) return "";
+/* Cards compactos das contas (parceladas, recorrentes e "só lembrete"), recolhidos por padrão */
+function contasCards(nat){
   const isP=nat==="pagar", t=todayStr();
-  const cards=[...G.entries()].map(([k,it])=>{ it.sort((a,b)=>a.vencimento.localeCompare(b.vencimento));
-    const f=it[0], n=it.length, pg=it.filter(x=>x.pago), ab=it.filter(x=>!x.pago), tot=sum(it,x=>x.valor), vp=sum(pg,x=>x.valor), venc=ab.filter(x=>x.vencimento<t).length, prox=ab[0]; return {k,it,f,n,pg,ab,tot,vp,venc,prox}; })
-    .sort((a,b)=>(a.ab.length?0:1)-(b.ab.length?0:1) || (a.prox?.vencimento||"9").localeCompare(b.prox?.vencimento||"9"));
+  const G=new Map(); byTipo("lanc").filter(r=>r.natureza===nat && !isCard(r) && (r.totalParcelas>1 || r.foraFluxo)).forEach(r=>{ const k=r.grupo||r.id; (G.get(k)||G.set(k,[]).get(k)).push(r); });
+  const cs=[...G.entries()].map(([k,it])=>{ it.sort((a,b)=>a.vencimento.localeCompare(b.vencimento));
+    const f=it[0], ab=it.filter(x=>!x.pago), tot=sum(it,x=>x.valor), vp=sum(it.filter(x=>x.pago),x=>x.valor);
+    return {k,it,f,n:it.length,np:it.length-ab.length,ab,tot,vp,venc:ab.filter(x=>x.vencimento<t).length,prox:ab[0],fora:it.some(x=>x.foraFluxo)}; })
+    .filter(c=>c.ab.length).sort((a,b)=>(b.venc?1:0)-(a.venc?1:0) || a.prox.vencimento.localeCompare(b.prox.vencimento));
+  if(!cs.length) return "";
+  const aberto = !!ui.cardsAbertos;
   const card = c => { const open=ui.open.has("lg:"+c.k); const prog=c.tot?c.vp/c.tot*100:0;
-    return `<div class="ccard ${open?"wide":""}" style="--mc:var(--c-${nat})">
-      <div class="row" style="justify-content:space-between;align-items:flex-start"><div style="min-width:0"><h4>${esc(c.f.descricao)}</h4><div class="who">${esc([c.f.parte,c.f.categoria].filter(Boolean).join(" · "))}</div></div>
-        ${c.venc?`<span class="pill st-vencido">${c.venc} vencida(s)</span>`:!c.ab.length?`<span class="pill st-pago">${isP?"Quitado":"Recebido"}</span>`:""}</div>
-      <div class="facts">
-        <div class="fact"><div class="l">Total</div><div class="v">${money(c.tot)}</div></div>
-        <div class="fact"><div class="l">${isP?"Pago":"Recebido"}</div><div class="v pos">${money(c.vp)}</div></div>
-        <div class="fact"><div class="l">Falta ${isP?"pagar":"receber"}</div><div class="v">${money(c.tot-c.vp)}</div></div>
-        <div class="fact"><div class="l">Próxima</div><div class="v">${c.prox?`${dt(c.prox.vencimento)} · ${money(c.prox.valor)}`:"—"}</div></div>
-      </div>
-      <div><div class="bar"><span style="width:${prog}%"></span></div><div class="prog"><span>${c.pg.length} de ${c.n} ${c.n>1?"parcelas":"parcela"} ${isP?"paga(s)":"recebida(s)"}</span><span>${Math.round(prog)}%</span></div></div>
-      <div class="row"><button class="btn sm" data-act="toggle-parcelas" data-id="lg:${esc(c.k)}">${open?"Ocultar parcelas":"Ver parcelas"}</button><button class="btn sm" data-act="edit-lanc" data-id="${c.prox?.id||c.f.id}">Editar</button></div>
-      ${open?`<div class="tw"><table style="min-width:0"><thead><tr><th>Nº</th><th>Vencimento</th><th class="r">Valor</th><th>Status</th><th class="r"></th></tr></thead><tbody>
-        ${c.it.map((x,i)=>{ const e={pago:x.pago,venc:x.vencimento,natureza:nat}; return `<tr class="${x.pago?"is-pago":""}"><td class="num">${x.parcela||i+1}/${x.totalParcelas||c.n}</td><td class="num">${dt(x.vencimento)}</td><td class="r num">${money(x.valor)}</td><td>${pill(e)}</td>
-          <td><div class="acts"><button class="pay ${x.pago?"done":""}" data-act="pago" data-key="l:${x.id}">${x.pago?"✓ "+(isP?"Pago":"Recebido"):(isP?"Pagar":"Receber")}</button><button class="icon-btn" data-act="edit-lanc" data-id="${x.id}" title="Editar" aria-label="Editar parcela">✎</button></div></td></tr>`; }).join("")}
-      </tbody></table></div>`:""}
+    return `<div class="mcard ${open?"open":""} ${c.venc?"late":""}">
+      <div class="mc-top"><b title="${esc(c.f.descricao)}">${esc(c.f.descricao)}</b>${c.fora?`<span class="tick more" title="Fora do fluxo e da DRE">Só lembrete</span>`:""}</div>
+      <small class="mc-who">${esc([c.f.parte,c.f.categoria].filter(Boolean).join(" · "))}</small>
+      <div class="bar"><span style="width:${prog}%"></span></div>
+      <div class="mc-l"><span>${c.np}/${c.n} ${isP?"pagas":"recebidas"} · ${money(c.vp)}</span><span>${Math.round(prog)}%</span></div>
+      <div class="mc-l"><span class="${c.venc?"neg":""}">${c.venc?`${c.venc} vencida(s)`:`Próx. ${dt(c.prox.vencimento)}`}</span><b>${money(c.prox.valor)}</b></div>
+      <div class="mc-l"><span>Falta ${money(c.tot-c.vp)}</span><button class="lnk" data-act="toggle-parcelas" data-id="lg:${esc(c.k)}">${open?"Ocultar":"Parcelas"}</button></div>
+      ${open?`<div class="mc-ps">${c.it.map((x,i)=>`<div class="${x.pago?"is-pago":""}"><span>${x.parcela||i+1}/${x.totalParcelas||c.n} · ${dt(x.vencimento)}</span><span class="num">${money(x.valor)}</span><button class="pay sm ${x.pago?"done":""}" data-act="pago" data-key="l:${x.id}">${x.pago?"✓":(isP?"Pagar":"Receber")}</button><button class="icon-btn" data-act="edit-lanc" data-id="${x.id}" aria-label="Editar">✎</button></div>`).join("")}</div>`:""}
     </div>`; };
-  return `<div class="panel" style="--mc:var(--c-${nat})"><div class="ghead"><h3>Acompanhamentos · só lembrete</h3><span class="note" style="margin:0">Fora do fluxo de caixa e da DRE</span></div><div class="cards">${cards.map(card).join("")}</div></div>`;
+  return `<div class="mcards-w"><button class="btn sm" data-act="toggle-cards" aria-expanded="${aberto}">${aberto?"▴ Recolher cards das contas":`▾ Ver cards das contas (${cs.length})`}</button>
+    ${aberto?`<div class="mcards">${cs.map(card).join("")}</div>`:""}</div>`;
 }
 function tabelaEntries(L,nat){
   if (!L.length) return `<div class="tw"><div class="empty"><b>Nenhum lançamento aqui</b>${ui.todos?"":"Troque o mês, marque “Todos os meses” ou "}clique em “+ Nova conta a ${nat}”.</div></div>`;
@@ -2516,6 +2524,7 @@ document.addEventListener("click", ev=>{
     case "edit-contrato": { const c=getRec(b.dataset.id); c&&formContrato(c.modalidade,c.id); break; }
     case "open-contrato": ui.open.add(b.dataset.id); goView(b.dataset.mod, ()=>setTimeout(()=>{const el=document.getElementById("ct-"+b.dataset.id); el&&el.scrollIntoView({block:"start"});},50)); break;
     case "del-contrato": { const c=getRec(b.dataset.id); if(!c) break; ask("Excluir registro",`Excluir <b>${esc(c.nome)}</b>? Todas as ${c.parcelas?.length||0} parcelas saem de contas a ${MODS[c.modalidade].nat}.`,[{label:"Excluir",cls:"danger",fn:()=>{delRec(c.id);toast("Registro excluído.");}}],`--c-${c.modalidade}`); break; }
+    case "toggle-cards": ui.cardsAbertos=!ui.cardsAbertos; render(); break;
     case "toggle-parcelas": ui.open.has(b.dataset.id)?ui.open.delete(b.dataset.id):ui.open.add(b.dataset.id); render(); break;
     case "tx-add": { const w=$("#taxas"); w.insertAdjacentHTML("beforeend",formContrato.taxRow({tipo:"mensal"})); w.lastElementChild.querySelector("input").focus(); modalInput&&modalInput(new FormData($("#mform"))); break; }
     case "tx-del": b.closest("[data-tax]").remove(); modalInput&&modalInput(new FormData($("#mform"))); break;
