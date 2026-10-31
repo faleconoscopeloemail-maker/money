@@ -777,7 +777,7 @@ function renderSide(){
       <button class="nav ${ui.view===k?"on":""}" data-act="view" data-v="${k}" style="--mc:var(${c})"><span class="ico">${icon(k)}</span>${l}${PROTEGIDAS.has(k)&&pinAtivo()&&!(ui.sec&&ui.view===k)?`<span class="lk-i" title="Protegido por senha">${icon("lock")}</span>`:""}${counts[k]?`<span class="cnt" title="vencidos">${counts[k]}</span>`:""}</button>`).join("")}</div>`).join("")}
     <div class="sidefoot">
       <div class="sync cloud"><i></i>Sincronizado${sessao?.user?.email?` · ${esc(sessao.user.email)}`:""}</div>
-      <small style="color:var(--side-muted);font-size:11px;padding:0 12px">Versão 17 · 31/10/2026</small>
+      <small style="color:var(--side-muted);font-size:11px;padding:0 12px">Versão 18 · 31/10/2026</small>
       <a class="btn sm ghost" href="manual.pdf" target="_blank" rel="noopener" style="text-decoration:none">📘 Manual de uso</a>
       <button class="btn sm ghost" data-act="backup-json">Baixar backup (JSON)</button>
       <button class="btn sm ghost" data-act="backup-csv">Exportar lançamentos (CSV)</button>
@@ -939,17 +939,18 @@ function viewLista(nat){
   const isP = nat==="pagar";
   const base = allEntries().filter(e=>e.natureza===nat);
   const L = filtrar(base);
-  const tot=sum(L,e=>e.valor), pg=sum(L.filter(e=>e.pago),e=>e.valor), vc=sum(L.filter(e=>!e.pago&&e.venc<todayStr()),e=>e.valor);
+  const LS = L.filter(e=>!e.fora); /* "só lembrete" não soma nos totais */ const lemb=sum(L.filter(e=>e.fora),e=>e.valor), nLemb=L.filter(e=>e.fora).length;
+  const tot=sum(LS,e=>e.valor), pg=sum(LS.filter(e=>e.pago),e=>e.valor), vc=sum(LS.filter(e=>!e.pago&&e.venc<todayStr()),e=>e.valor);
   const origensUsadas = [...new Set(base.map(e=>e.origem))];
   const verbo = isP?"Pago":"Recebido";
   return `
   <div class="head"><div><h2><span class="sw">${icon(ui.view)}</span>Contas a ${nat}</h2><p class="sub">${isP?"Despesas à vista, parceladas e recorrentes + compras no cartão":"Receitas à vista, parceladas e recorrentes"}</p></div>
     <div class="row">${ui.todos?"":monthNav()}${pdfBtn()}<button class="btn pri" data-act="novo-lanc" data-nat="${nat}">+ Nova conta a ${nat}</button></div></div>
   <div class="kpis">
-    <div class="kpi" style="--kc:var(--mc)"><span class="l">Total ${ui.todos?"(todos os meses)":perDe()}</span><span class="v">${money(tot)}</span><span class="d">${L.length} lançamento(s)</span></div>
+    <div class="kpi" style="--kc:var(--mc)"><span class="l">Total ${ui.todos?"(todos os meses)":perDe()}</span><span class="v">${money(tot)}</span><span class="d">${LS.length} lançamento(s)${nLemb?` · fora do total: ${money(lemb)} só lembrete`:""}</span></div>
     <div class="kpi" style="--kc:var(--ok)"><span class="l">${verbo}</span><span class="v">${money(pg)}</span><span class="d">${tot?Math.round(pg/tot*100):0}% do total</span></div>
-    <div class="kpi" style="--kc:var(--idle)"><span class="l">Em aberto</span><span class="v">${money(tot-pg)}</span><span class="d">${L.filter(e=>!e.pago).length} lançamento(s)</span></div>
-    <div class="kpi" style="--kc:var(--bad)"><span class="l">Vencido</span><span class="v ${vc?"neg":""}">${money(vc)}</span><span class="d">${L.filter(e=>!e.pago&&e.venc<todayStr()).length} lançamento(s)</span></div>
+    <div class="kpi" style="--kc:var(--idle)"><span class="l">Em aberto</span><span class="v">${money(tot-pg)}</span><span class="d">${LS.filter(e=>!e.pago).length} lançamento(s)</span></div>
+    <div class="kpi" style="--kc:var(--bad)"><span class="l">Vencido</span><span class="v ${vc?"neg":""}">${money(vc)}</span><span class="d">${LS.filter(e=>!e.pago&&e.venc<todayStr()).length} lançamento(s)</span></div>
   </div>
   <div class="toolbar">
     <input type="search" id="f-busca" data-filter="busca" placeholder="Buscar descrição, categoria…" value="${esc(ui.busca)}">
@@ -995,7 +996,7 @@ function tabelaEntries(L,nat){
         : e.origem==="cartao"?(e.key.startsWith("l:")?`<button class="icon-btn" data-act="edit-item-cartao" data-id="${e.id}" title="Editar este lançamento" aria-label="Editar lançamento do cartão">✎</button>`:"")+`<button class="icon-btn" data-act="goto-fatura" data-m="${e.venc.slice(0,7)}" title="Ver fatura no cartão" aria-label="Ver fatura no cartão">↗</button>`
         : e.origem==="invest"?`<button class="icon-btn" data-act="goto" data-v="invest" title="Abrir investimento" aria-label="Abrir investimento">↗</button>`
         : `<button class="icon-btn" data-act="edit-parcela" data-id="${e.id}" data-idx="${e.idx}" title="Editar parcela" aria-label="Editar parcela">✎</button><button class="icon-btn" data-act="open-contrato" data-id="${e.id}" data-mod="${e.origem}" title="Abrir contrato" aria-label="Abrir contrato">↗</button>`}</div></td></tr>${ab?`<tr class="rc-row"><td colspan="8">${contaCard(lr,e.key)}</td></tr>`:""}`; }).join("")}
-  </tbody><tfoot><tr><td colspan="6">Total</td><td class="r num">${money(sum(L,e=>e.valor))}</td><td></td></tr></tfoot></table></div>`;
+  </tbody><tfoot><tr><td colspan="6">Total${L.some(e=>e.fora)?` <small style="font-weight:500;color:var(--muted)">(não inclui ${money(sum(L.filter(e=>e.fora),e=>e.valor))} de “só lembrete”)</small>`:""}</td><td class="r num">${money(sum(L.filter(e=>!e.fora),e=>e.valor))}</td><td></td></tr></tfoot></table></div>`;
 }
 
 /* ============ Cartão ============ */
@@ -2337,9 +2338,9 @@ function reportSpec(){
     tbl("Gastos por categoria",["Categoria","Valor","% das saídas"],Object.entries(byC).sort((a,b)=>b[1]-a[1]).map(([c,x])=>[pdfTxt(c),money(x),pT?pctf(x/pT*100,1):"-"]),{num:[1,2]});
     tbl("Lançamentos do período",["Venc.","Descrição","Origem","Categoria","Tipo","Valor","Status"],[...R,...P].sort((a,b)=>a.venc.localeCompare(b.venc)).map(entRow),{num:[5]});
   } else if (v==="pagar"||v==="receber"){
-    const L=filtrar(E.filter(e=>e.natureza===v)); const tot=sum(L,e=>e.valor), pg=sum(L.filter(e=>e.pago),e=>e.valor);
-    kp([["Total",money(tot),v==="pagar"?"--c-pagar":"--c-receber"],[v==="pagar"?"Pago":"Recebido",money(pg),"--ok"],["Em aberto",money(tot-pg),"--idle"],["Vencido",money(sum(L.filter(e=>!e.pago&&e.venc<t),e=>e.valor)),"--bad"]]);
-    tbl(`${L.length} lançamento(s)`,["Venc.","Descrição","Origem","Categoria","Tipo","Valor","Status","Pago em"],L.map(e=>[dt(e.venc),pdfTxt(e.descricao)+(e.detalhe?"\n"+pdfTxt(e.detalhe):""),ORIGENS[e.origem],pdfTxt(e.categoria),e.classe==="fixa"?"Fixa":"Variável",money(e.valor),stLabel(e),e.pago?dt(e.dataPag):"-"]),{num:[5],foot:["","Total","","","",money(tot),"",""]});
+    const L=filtrar(E.filter(e=>e.natureza===v)); const LS=L.filter(e=>!e.fora); const tot=sum(LS,e=>e.valor), pg=sum(LS.filter(e=>e.pago),e=>e.valor);
+    kp([["Total",money(tot),v==="pagar"?"--c-pagar":"--c-receber"],[v==="pagar"?"Pago":"Recebido",money(pg),"--ok"],["Em aberto",money(tot-pg),"--idle"],["Vencido",money(sum(LS.filter(e=>!e.pago&&e.venc<t),e=>e.valor)),"--bad"]]);
+    tbl(`${L.length} lançamento(s)`,["Venc.","Descrição","Origem","Categoria","Tipo","Valor","Status","Pago em"],L.map(e=>[dt(e.venc),pdfTxt(e.descricao)+(e.fora?" (só lembrete, fora do total)":"")+(e.detalhe?"\n"+pdfTxt(e.detalhe):""),ORIGENS[e.origem],pdfTxt(e.categoria),e.classe==="fixa"?"Fixa":"Variável",money(e.valor),stLabel(e),e.pago?dt(e.dataPag):"-"]),{num:[5],foot:["","Total","","","",money(tot),"",""]});
   } else if (v==="cartao"){
     const L=byTipo("lanc").filter(r=>r.forma==="Cartão de crédito"); const per=L.filter(r=>inPer(r.vencimento)).sort((a,b)=>a.vencimento.localeCompare(b.vencimento));
     kp([["Faturas do período",money(sum(per,r=>r.valor)),"--c-cartao"],["Pago",money(sum(per.filter(r=>r.pago),r=>r.valor)),"--ok"],["Em aberto no período",money(sum(per.filter(r=>!r.pago),r=>r.valor)),"--idle"],["Parcelas futuras",money(sum(L.filter(r=>!r.pago),r=>r.valor)),"--warn"]]);
