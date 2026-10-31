@@ -194,6 +194,15 @@ tfoot td{font-weight:700;background:var(--surface-2)}
 .legend span{display:inline-flex;align-items:center;gap:6px}
 .legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
 .hbars{display:flex;flex-direction:column;gap:12px}
+tr.clk{cursor:pointer}tr.clk:hover td{background:color-mix(in srgb,var(--mc,var(--accent)) 5%,var(--surface))}tr.rc-on td{background:color-mix(in srgb,var(--mc,var(--accent)) 7%,var(--surface));border-bottom:0}
+tr.rc-row>td{padding:4px 14px 14px;background:color-mix(in srgb,var(--mc,var(--accent)) 7%,var(--surface))}
+.rcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:12px;cursor:pointer;box-shadow:var(--shadow)}
+.rcard h4{margin:0;font-size:15px}.rcard .who{color:var(--muted);font-size:12.5px;margin-top:2px}
+.rcard .facts{grid-template-columns:repeat(4,minmax(0,1fr))}
+.rc-ps{display:flex;flex-direction:column;max-height:300px;overflow:auto;border-top:1px solid var(--line);cursor:default}
+.rc-ps div{display:grid;grid-template-columns:52px 96px 1fr auto auto auto;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px}
+.rc-ps .is-pago{color:var(--muted)}.rc-ps .cur{font-weight:700}.rc-ps .pay.sm{padding:3px 10px;font-size:11.5px}
+@media (max-width:700px){.rcard .facts{grid-template-columns:1fr 1fr}.rc-ps div{grid-template-columns:44px 1fr auto auto}.rc-ps div .pill,.rc-ps div>span:nth-child(2){display:none}}
 .mcards-w{margin:0 0 14px;display:flex;flex-direction:column;gap:12px;align-items:flex-start}
 .mcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;width:100%;align-items:start}
 .mcard{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 12px;display:flex;flex-direction:column;gap:6px;font-size:12.5px;box-shadow:var(--shadow);min-width:0}
@@ -768,7 +777,7 @@ function renderSide(){
       <button class="nav ${ui.view===k?"on":""}" data-act="view" data-v="${k}" style="--mc:var(${c})"><span class="ico">${icon(k)}</span>${l}${PROTEGIDAS.has(k)&&pinAtivo()&&!(ui.sec&&ui.view===k)?`<span class="lk-i" title="Protegido por senha">${icon("lock")}</span>`:""}${counts[k]?`<span class="cnt" title="vencidos">${counts[k]}</span>`:""}</button>`).join("")}</div>`).join("")}
     <div class="sidefoot">
       <div class="sync cloud"><i></i>Sincronizado${sessao?.user?.email?` · ${esc(sessao.user.email)}`:""}</div>
-      <small style="color:var(--side-muted);font-size:11px;padding:0 12px">Versão 16 · 31/10/2026</small>
+      <small style="color:var(--side-muted);font-size:11px;padding:0 12px">Versão 17 · 31/10/2026</small>
       <a class="btn sm ghost" href="manual.pdf" target="_blank" rel="noopener" style="text-decoration:none">📘 Manual de uso</a>
       <button class="btn sm ghost" data-act="backup-json">Baixar backup (JSON)</button>
       <button class="btn sm ghost" data-act="backup-csv">Exportar lançamentos (CSV)</button>
@@ -952,31 +961,21 @@ function viewLista(nat){
     </select>
     <label class="chk"><input type="checkbox" id="f-todos" data-filter="todos" ${ui.todos?"checked":""}> Todos os meses</label>
   </div>
-  ${contasCards(nat)}
   ${tabelaEntries(L,nat)}`;
 }
-/* Cards compactos das contas (parceladas, recorrentes e "só lembrete"), recolhidos por padrão */
-function contasCards(nat){
-  const isP=nat==="pagar", t=todayStr();
-  const G=new Map(); byTipo("lanc").filter(r=>r.natureza===nat && !isCard(r) && (r.totalParcelas>1 || r.foraFluxo)).forEach(r=>{ const k=r.grupo||r.id; (G.get(k)||G.set(k,[]).get(k)).push(r); });
-  const cs=[...G.entries()].map(([k,it])=>{ it.sort((a,b)=>a.vencimento.localeCompare(b.vencimento));
-    const f=it[0], ab=it.filter(x=>!x.pago), tot=sum(it,x=>x.valor), vp=sum(it.filter(x=>x.pago),x=>x.valor);
-    return {k,it,f,n:it.length,np:it.length-ab.length,ab,tot,vp,venc:ab.filter(x=>x.vencimento<t).length,prox:ab[0],fora:it.some(x=>x.foraFluxo)}; })
-    .filter(c=>c.ab.length).sort((a,b)=>(b.venc?1:0)-(a.venc?1:0) || a.prox.vencimento.localeCompare(b.prox.vencimento));
-  if(!cs.length) return "";
-  const aberto = !!ui.cardsAbertos;
-  const card = c => { const open=ui.open.has("lg:"+c.k); const prog=c.tot?c.vp/c.tot*100:0;
-    return `<div class="mcard ${open?"open":""} ${c.venc?"late":""}">
-      <div class="mc-top"><b title="${esc(c.f.descricao)}">${esc(c.f.descricao)}</b>${c.fora?`<span class="tick more" title="Fora do fluxo e da DRE">Só lembrete</span>`:""}</div>
-      <small class="mc-who">${esc([c.f.parte,c.f.categoria].filter(Boolean).join(" · "))}</small>
-      <div class="bar"><span style="width:${prog}%"></span></div>
-      <div class="mc-l"><span>${c.np}/${c.n} ${isP?"pagas":"recebidas"} · ${money(c.vp)}</span><span>${Math.round(prog)}%</span></div>
-      <div class="mc-l"><span class="${c.venc?"neg":""}">${c.venc?`${c.venc} vencida(s)`:`Próx. ${dt(c.prox.vencimento)}`}</span><b>${money(c.prox.valor)}</b></div>
-      <div class="mc-l"><span>Falta ${money(c.tot-c.vp)}</span><button class="lnk" data-act="toggle-parcelas" data-id="lg:${esc(c.k)}">${open?"Ocultar":"Parcelas"}</button></div>
-      ${open?`<div class="mc-ps">${c.it.map((x,i)=>`<div class="${x.pago?"is-pago":""}"><span>${x.parcela||i+1}/${x.totalParcelas||c.n} · ${dt(x.vencimento)}</span><span class="num">${money(x.valor)}</span><button class="pay sm ${x.pago?"done":""}" data-act="pago" data-key="l:${x.id}">${x.pago?"✓":(isP?"Pagar":"Receber")}</button><button class="icon-btn" data-act="edit-lanc" data-id="${x.id}" aria-label="Editar">✎</button></div>`).join("")}</div>`:""}
-    </div>`; };
-  return `<div class="mcards-w"><button class="btn sm" data-act="toggle-cards" aria-expanded="${aberto}">${aberto?"▴ Recolher cards das contas":`▾ Ver cards das contas (${cs.length})`}</button>
-    ${aberto?`<div class="mcards">${cs.map(card).join("")}</div>`:""}</div>`;
+/* Card da conta que abre ao clicar na linha (contas a pagar/receber): resumo do parcelamento e parcelas */
+function contaCard(r,rowKey){
+  const nat=r.natureza, isP=nat==="pagar", t=todayStr();
+  const it = r.grupo ? byTipo("lanc").filter(x=>x.grupo===r.grupo).sort((a,b)=>a.vencimento.localeCompare(b.vencimento)) : [r];
+  const ab=it.filter(x=>!x.pago), tot=sum(it,x=>x.valor), vp=sum(it.filter(x=>x.pago),x=>x.valor), venc=ab.filter(x=>x.vencimento<t).length, prox=ab[0], n=it.length, prog=tot?vp/tot*100:0;
+  const fact=(l,v,c="")=>`<div class="fact"><div class="l">${l}</div><div class="v ${c}">${v}</div></div>`;
+  return `<div class="rcard" data-act="row-card" data-k="${esc(rowKey)}" title="Clique para fechar">
+    <div class="row" style="justify-content:space-between;align-items:flex-start;gap:10px"><div style="min-width:0"><h4>${esc(r.descricao)}${r.foraFluxo?` <span class="tick more">Só lembrete</span>`:""}</h4><div class="who">${esc([r.parte,r.categoria,r.forma,r.classe==="fixa"?"Fixa":"Variável"].filter(Boolean).join(" · "))}</div>${r.obs?`<div class="who">${esc(r.obs)}</div>`:""}</div>
+      ${venc?`<span class="pill st-vencido">${venc} vencida(s)</span>`:!ab.length?`<span class="pill st-pago">${isP?"Quitado":"Recebido"}</span>`:""}</div>
+    <div class="facts">${fact("Total",money(tot))}${fact(isP?"Pago":"Recebido",money(vp),"pos")}${fact("Falta "+(isP?"pagar":"receber"),money(tot-vp))}${fact("Próxima",prox?`${dt(prox.vencimento)} · ${money(prox.valor)}`:"—")}</div>
+    ${n>1?`<div><div class="bar"><span style="width:${prog}%"></span></div><div class="prog"><span>${n-ab.length} de ${n} ${isP?"pagas":"recebidas"}${r.cond==="recorrente"?" · recorrente":""}</span><span>${Math.round(prog)}%</span></div></div>
+    <div class="rc-ps">${it.map((x,i)=>`<div class="${x.pago?"is-pago":""} ${x.id===r.id?"cur":""}"><span>${x.parcela||i+1}/${x.totalParcelas||n}</span><span>${dt(x.vencimento)}</span><span class="num">${money(x.valor)}</span>${pill({pago:x.pago,venc:x.vencimento,natureza:nat})}<button class="pay sm ${x.pago?"done":""}" data-act="pago" data-key="l:${x.id}">${x.pago?"✓":(isP?"Pagar":"Receber")}</button><button class="icon-btn" data-act="edit-lanc" data-id="${x.id}" aria-label="Editar">✎</button></div>`).join("")}</div>`:""}
+  </div>`;
 }
 function tabelaEntries(L,nat){
   if (!L.length) return `<div class="tw"><div class="empty"><b>Nenhum lançamento aqui</b>${ui.todos?"":"Troque o mês, marque “Todos os meses” ou "}clique em “+ Nova conta a ${nat}”.</div></div>`;
@@ -985,7 +984,8 @@ function tabelaEntries(L,nat){
   L = L.slice().sort((a,b)=>{ const x=val(a), y=val(b); const c = typeof x==="number"&&typeof y==="number" ? x-y : String(x).localeCompare(String(y),"pt-BR",{numeric:true}); return (c||a.venc.localeCompare(b.venc))*o.d; });
   const th = (k,l,cls="") => `<th class="${cls}" aria-sort="${o.k===k?(o.d>0?"ascending":"descending"):"none"}"><button class="thsort ${o.k===k?"on":""}" data-act="ord" data-k="${k}" title="Ordenar por ${l.toLowerCase()}">${l}<span>${o.k===k?(o.d>0?"▲":"▼"):"↕"}</span></button></th>`;
   return `<div class="tw"><table><thead><tr>${th("status","Status")}${th("venc","Vencimento")}${th("descricao","Descrição")}${th("origem","Origem")}${th("categoria","Categoria")}${th("classe","Tipo")}${th("valor","Valor","r")}<th class="r">Ações</th></tr></thead><tbody>
-  ${L.map(e=>`<tr class="${e.pago?"is-pago":""}">
+  ${L.map(e=>{ const lr = e.origem==="conta" && e.key.startsWith("l:") ? getRec(e.id) : null; const ab = lr && ui.open.has("rc:"+e.key);
+    return `<tr class="${e.pago?"is-pago":""} ${lr?"clk":""} ${ab?"rc-on":""}" ${lr?`data-act="row-card" data-k="${e.key}" title="Clique para ver o card da conta"`:""}>
     <td>${pill(e)}</td><td class="num">${dt(e.venc)}</td>
     <td class="desc">${esc(e.descricao)}${e.fora?` <span class="tick more" title="Não entra no fluxo de caixa nem na DRE">Só lembrete</span>`:""}${e.detalhe?`<small>${esc(e.detalhe)}</small>`:""}</td>
     <td>${chipO(e.origem)}</td><td><span class="catname"><i style="background:${catColor(e.categoria)}"></i>${esc(e.categoria)}</span></td><td>${e.classe==="fixa"?"Fixa":"Variável"}</td>
@@ -994,7 +994,7 @@ function tabelaEntries(L,nat){
       ${e.origem==="conta"?`<button class="icon-btn" data-act="edit-lanc" data-id="${e.id}" title="Editar" aria-label="Editar">✎</button><button class="icon-btn" data-act="del-lanc" data-id="${e.id}" title="Excluir" aria-label="Excluir">✕</button>`
         : e.origem==="cartao"?(e.key.startsWith("l:")?`<button class="icon-btn" data-act="edit-item-cartao" data-id="${e.id}" title="Editar este lançamento" aria-label="Editar lançamento do cartão">✎</button>`:"")+`<button class="icon-btn" data-act="goto-fatura" data-m="${e.venc.slice(0,7)}" title="Ver fatura no cartão" aria-label="Ver fatura no cartão">↗</button>`
         : e.origem==="invest"?`<button class="icon-btn" data-act="goto" data-v="invest" title="Abrir investimento" aria-label="Abrir investimento">↗</button>`
-        : `<button class="icon-btn" data-act="edit-parcela" data-id="${e.id}" data-idx="${e.idx}" title="Editar parcela" aria-label="Editar parcela">✎</button><button class="icon-btn" data-act="open-contrato" data-id="${e.id}" data-mod="${e.origem}" title="Abrir contrato" aria-label="Abrir contrato">↗</button>`}</div></td></tr>`).join("")}
+        : `<button class="icon-btn" data-act="edit-parcela" data-id="${e.id}" data-idx="${e.idx}" title="Editar parcela" aria-label="Editar parcela">✎</button><button class="icon-btn" data-act="open-contrato" data-id="${e.id}" data-mod="${e.origem}" title="Abrir contrato" aria-label="Abrir contrato">↗</button>`}</div></td></tr>${ab?`<tr class="rc-row"><td colspan="8">${contaCard(lr,e.key)}</td></tr>`:""}`; }).join("")}
   </tbody><tfoot><tr><td colspan="6">Total</td><td class="r num">${money(sum(L,e=>e.valor))}</td><td></td></tr></tfoot></table></div>`;
 }
 
@@ -2524,7 +2524,7 @@ document.addEventListener("click", ev=>{
     case "edit-contrato": { const c=getRec(b.dataset.id); c&&formContrato(c.modalidade,c.id); break; }
     case "open-contrato": ui.open.add(b.dataset.id); goView(b.dataset.mod, ()=>setTimeout(()=>{const el=document.getElementById("ct-"+b.dataset.id); el&&el.scrollIntoView({block:"start"});},50)); break;
     case "del-contrato": { const c=getRec(b.dataset.id); if(!c) break; ask("Excluir registro",`Excluir <b>${esc(c.nome)}</b>? Todas as ${c.parcelas?.length||0} parcelas saem de contas a ${MODS[c.modalidade].nat}.`,[{label:"Excluir",cls:"danger",fn:()=>{delRec(c.id);toast("Registro excluído.");}}],`--c-${c.modalidade}`); break; }
-    case "toggle-cards": ui.cardsAbertos=!ui.cardsAbertos; render(); break;
+    case "row-card": { const k="rc:"+b.dataset.k; ui.open.has(k)?ui.open.delete(k):ui.open.add(k); render(); break; }
     case "toggle-parcelas": ui.open.has(b.dataset.id)?ui.open.delete(b.dataset.id):ui.open.add(b.dataset.id); render(); break;
     case "tx-add": { const w=$("#taxas"); w.insertAdjacentHTML("beforeend",formContrato.taxRow({tipo:"mensal"})); w.lastElementChild.querySelector("input").focus(); modalInput&&modalInput(new FormData($("#mform"))); break; }
     case "tx-del": b.closest("[data-tax]").remove(); modalInput&&modalInput(new FormData($("#mform"))); break;
