@@ -683,7 +683,7 @@ function allEntries(opt={}){
         f.valor=r2(f.valor+r.valor); f.n++; if(r.vencimento<f.venc) f.venc=r.vencimento; if(!r.pago) f.pago=false; else if(!f.dataPag||(r.dataPagamento||"")>f.dataPag) f.dataPag=r.dataPagamento||r.vencimento; continue; }
       out.push({key:"l:"+r.id, id:r.id, origem:card?"cartao":"conta", natureza:r.natureza, descricao:card?`${r.descricao}`:r.descricao,
         detalhe: (r.parte?r.parte+" · ":"")+(card ? `${cardNameOf(r)} · ${condTxt(r)}` : (r.totalParcelas>1?`${condTxt(r)} · ${r.forma||""}`:(r.forma||"")))+(r.editado?" · alterado neste mês":""),
-        categoria:r.categoria||"Outros", classe:r.classe||"variavel", valor:r.valor, venc:r.vencimento, pago:!!r.pago, dataPag:r.dataPagamento, editavel:true, card});
+        categoria:r.categoria||"Outros", classe:r.classe||"variavel", valor:r.valor, venc:r.vencimento, pago:!!r.pago, dataPag:r.dataPagamento, editavel:true, card, fora:!!r.foraFluxo});
     } else if (r.tipo==="contrato"){
       continue; /* compromissos foram retirados: as parcelas que estavam em contas viraram lançamentos comuns (migrarCompromissos) */
       const M = MODS[r.modalidade]; if(!M) continue; const fora = foraFluxo(r); if(fora && !opt.todos) continue;
@@ -748,7 +748,7 @@ function renderSide(){
   adminCheck();
   const E = allEntries({todos:true}); const t=todayStr();
   const venc = o => E.filter(e=>!e.pago&&e.venc<t&&(o(e))).length;
-  const counts = {pagar:venc(e=>e.natureza==="pagar"&&!e.fora), receber:venc(e=>e.natureza==="receber"&&!e.fora), cartao:venc(e=>e.origem==="cartao"),
+  const counts = {pagar:venc(e=>e.natureza==="pagar"), receber:venc(e=>e.natureza==="receber"), cartao:venc(e=>e.origem==="cartao"),
     financiamento:venc(e=>e.origem==="financiamento"), emprestimo:venc(e=>e.origem==="emprestimo"), aquisicao:venc(e=>e.origem==="aquisicao"), devedor:venc(e=>e.origem==="devedor")};
   $("#side").innerHTML = `
     <div class="brand"><h1 class="sr">Money · Finanças pessoais</h1><img class="lf" alt="Money – Finanças pessoais" src="${LOGO_FULL}"><img class="lm" alt="Money" src="${LOGO_MARK}"></div>
@@ -756,7 +756,7 @@ function renderSide(){
       <button class="nav ${ui.view===k?"on":""}" data-act="view" data-v="${k}" style="--mc:var(${c})"><span class="ico">${icon(k)}</span>${l}${PROTEGIDAS.has(k)&&pinAtivo()&&!(ui.sec&&ui.view===k)?`<span class="lk-i" title="Protegido por senha">${icon("lock")}</span>`:""}${counts[k]?`<span class="cnt" title="vencidos">${counts[k]}</span>`:""}</button>`).join("")}</div>`).join("")}
     <div class="sidefoot">
       <div class="sync cloud"><i></i>Sincronizado${sessao?.user?.email?` · ${esc(sessao.user.email)}`:""}</div>
-      <small style="color:var(--side-muted);font-size:11px;padding:0 12px">Versão 14 · 31/10/2026</small>
+      <small style="color:var(--side-muted);font-size:11px;padding:0 12px">Versão 15 · 31/10/2026</small>
       <a class="btn sm ghost" href="manual.pdf" target="_blank" rel="noopener" style="text-decoration:none">📘 Manual de uso</a>
       <button class="btn sm ghost" data-act="backup-json">Baixar backup (JSON)</button>
       <button class="btn sm ghost" data-act="backup-csv">Exportar lançamentos (CSV)</button>
@@ -796,7 +796,7 @@ const pill = e => { const [c,l]=status(e); return `<span class="pill st-${c}">${
 function dreDados(meses){
   const real = ui.dreModo==="realizado"; const idx=new Map(meses.map((m,i)=>[m,i]));
   const G={receber:{},fixa:{},variavel:{}}; const nz=()=>meses.map(()=>0);
-  allEntries().forEach(e=>{ const d = real ? (e.pago ? (e.dataPag||e.venc) : null) : e.venc; if(!d) return; const i=idx.get(d.slice(0,7)); if(i===undefined) return;
+  allEntries().filter(e=>!e.fora).forEach(e=>{ const d = real ? (e.pago ? (e.dataPag||e.venc) : null) : e.venc; if(!d) return; const i=idx.get(d.slice(0,7)); if(i===undefined) return;
     const g = e.natureza==="receber" ? "receber" : (e.classe==="fixa" ? "fixa" : "variavel"); const c=e.categoria||"Outros";
     (G[g][c] ||= nz())[i] += e.valor; });
   const ord = o => Object.entries(o).sort((a,b)=>sum(b[1],x=>x)-sum(a[1],x=>x));
@@ -839,11 +839,11 @@ function viewDRE(){
 
 /* ============ Painel ============ */
 function viewPainel(){
-  const E = allEntries(); const t=todayStr();
+  const TODOS = allEntries(); const E = TODOS.filter(e=>!e.fora); /* "só lembrete" não entra nos números do Dashboard */ const t=todayStr();
   const doMes = E.filter(e=>inPer(e.venc));
   const P = doMes.filter(e=>e.natureza==="pagar"), R = doMes.filter(e=>e.natureza==="receber");
   const pT=sum(P,e=>e.valor), pP=sum(P.filter(e=>e.pago),e=>e.valor), rT=sum(R,e=>e.valor), rP=sum(R.filter(e=>e.pago),e=>e.valor);
-  const vencidos = E.filter(e=>!e.pago&&e.venc<t);
+  const vencidos = TODOS.filter(e=>!e.pago&&e.venc<t);
   const vp = vencidos.filter(e=>e.natureza==="pagar"), vr = vencidos.filter(e=>e.natureza==="receber");
   const saldo = rT-pT;
   const invs = byTipo("invest").map(invResumo);
@@ -859,10 +859,10 @@ function viewPainel(){
   const byO = Object.keys(ORIGENS).map(o=>[o,sum(P.filter(e=>e.origem===o),e=>e.valor)]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]);
   const maxO = Math.max(1,...byO.map(x=>x[1]));
   // por categoria (contas e cartão)
-  const catMap = {}; byTipo("lanc").filter(r=>r.natureza==="pagar"&&inPer(r.vencimento)).forEach(r=>catMap[r.categoria||"Outros"]=(catMap[r.categoria||"Outros"]||0)+r.valor);
+  const catMap = {}; byTipo("lanc").filter(r=>r.natureza==="pagar"&&!r.foraFluxo&&inPer(r.vencimento)).forEach(r=>catMap[r.categoria||"Outros"]=(catMap[r.categoria||"Outros"]||0)+r.valor);
   const byC = Object.entries(catMap).sort((a,b)=>b[1]-a[1]).slice(0,7); const maxC=Math.max(1,...byC.map(x=>x[1]));
 
-  const prox = E.filter(e=>!e.pago).filter(e=>e.venc<=addDays(t,30)).slice(0,10);
+  const prox = TODOS.filter(e=>!e.pago).filter(e=>e.venc<=addDays(t,30)).slice(0,10);
 
   return `
   <div class="head"><div><h2><span class="sw">${icon("painel")}</span>Dashboard</h2><p class="sub">Resumo ${ui.per==="ano"?"de "+ano():"de "+mesNome(ui.mes)}</p></div><div class="row">${monthNav()}${pdfBtn()}</div></div>
@@ -922,7 +922,7 @@ function viewLista(nat){
   const origensUsadas = [...new Set(base.map(e=>e.origem))];
   const verbo = isP?"Pago":"Recebido";
   return `
-  <div class="head"><div><h2><span class="sw">${icon(ui.view)}</span>Contas a ${nat}</h2><p class="sub">Lançamentos avulsos ${isP?"+ compras no cartão e parcelas de financiamentos e empréstimos":"+ parcelas de devedores"}</p></div>
+  <div class="head"><div><h2><span class="sw">${icon(ui.view)}</span>Contas a ${nat}</h2><p class="sub">${isP?"Despesas à vista, parceladas e recorrentes + compras no cartão":"Receitas à vista, parceladas e recorrentes"}</p></div>
     <div class="row">${ui.todos?"":monthNav()}${pdfBtn()}<button class="btn pri" data-act="novo-lanc" data-nat="${nat}">+ Nova conta a ${nat}</button></div></div>
   <div class="kpis">
     <div class="kpi" style="--kc:var(--mc)"><span class="l">Total ${ui.todos?"(todos os meses)":perDe()}</span><span class="v">${money(tot)}</span><span class="d">${L.length} lançamento(s)</span></div>
@@ -940,7 +940,35 @@ function viewLista(nat){
     </select>
     <label class="chk"><input type="checkbox" id="f-todos" data-filter="todos" ${ui.todos?"checked":""}> Todos os meses</label>
   </div>
+  ${lembreteCards(nat)}
   ${tabelaEntries(L,nat)}`;
+}
+/* Cards de acompanhamento dos lançamentos "só lembrete" (fora do fluxo e da DRE), agrupados por parcelamento */
+function lembreteCards(nat){
+  const G=new Map(); byTipo("lanc").filter(r=>r.natureza===nat && r.foraFluxo && !isCard(r)).forEach(r=>{ const k=r.grupo||r.id; (G.get(k)||G.set(k,[]).get(k)).push(r); });
+  if(!G.size) return "";
+  const isP=nat==="pagar", t=todayStr();
+  const cards=[...G.entries()].map(([k,it])=>{ it.sort((a,b)=>a.vencimento.localeCompare(b.vencimento));
+    const f=it[0], n=it.length, pg=it.filter(x=>x.pago), ab=it.filter(x=>!x.pago), tot=sum(it,x=>x.valor), vp=sum(pg,x=>x.valor), venc=ab.filter(x=>x.vencimento<t).length, prox=ab[0]; return {k,it,f,n,pg,ab,tot,vp,venc,prox}; })
+    .sort((a,b)=>(a.ab.length?0:1)-(b.ab.length?0:1) || (a.prox?.vencimento||"9").localeCompare(b.prox?.vencimento||"9"));
+  const card = c => { const open=ui.open.has("lg:"+c.k); const prog=c.tot?c.vp/c.tot*100:0;
+    return `<div class="ccard ${open?"wide":""}" style="--mc:var(--c-${nat})">
+      <div class="row" style="justify-content:space-between;align-items:flex-start"><div style="min-width:0"><h4>${esc(c.f.descricao)}</h4><div class="who">${esc([c.f.parte,c.f.categoria].filter(Boolean).join(" · "))}</div></div>
+        ${c.venc?`<span class="pill st-vencido">${c.venc} vencida(s)</span>`:!c.ab.length?`<span class="pill st-pago">${isP?"Quitado":"Recebido"}</span>`:""}</div>
+      <div class="facts">
+        <div class="fact"><div class="l">Total</div><div class="v">${money(c.tot)}</div></div>
+        <div class="fact"><div class="l">${isP?"Pago":"Recebido"}</div><div class="v pos">${money(c.vp)}</div></div>
+        <div class="fact"><div class="l">Falta ${isP?"pagar":"receber"}</div><div class="v">${money(c.tot-c.vp)}</div></div>
+        <div class="fact"><div class="l">Próxima</div><div class="v">${c.prox?`${dt(c.prox.vencimento)} · ${money(c.prox.valor)}`:"—"}</div></div>
+      </div>
+      <div><div class="bar"><span style="width:${prog}%"></span></div><div class="prog"><span>${c.pg.length} de ${c.n} ${c.n>1?"parcelas":"parcela"} ${isP?"paga(s)":"recebida(s)"}</span><span>${Math.round(prog)}%</span></div></div>
+      <div class="row"><button class="btn sm" data-act="toggle-parcelas" data-id="lg:${esc(c.k)}">${open?"Ocultar parcelas":"Ver parcelas"}</button><button class="btn sm" data-act="edit-lanc" data-id="${c.prox?.id||c.f.id}">Editar</button></div>
+      ${open?`<div class="tw"><table style="min-width:0"><thead><tr><th>Nº</th><th>Vencimento</th><th class="r">Valor</th><th>Status</th><th class="r"></th></tr></thead><tbody>
+        ${c.it.map((x,i)=>{ const e={pago:x.pago,venc:x.vencimento,natureza:nat}; return `<tr class="${x.pago?"is-pago":""}"><td class="num">${x.parcela||i+1}/${x.totalParcelas||c.n}</td><td class="num">${dt(x.vencimento)}</td><td class="r num">${money(x.valor)}</td><td>${pill(e)}</td>
+          <td><div class="acts"><button class="pay ${x.pago?"done":""}" data-act="pago" data-key="l:${x.id}">${x.pago?"✓ "+(isP?"Pago":"Recebido"):(isP?"Pagar":"Receber")}</button><button class="icon-btn" data-act="edit-lanc" data-id="${x.id}" title="Editar" aria-label="Editar parcela">✎</button></div></td></tr>`; }).join("")}
+      </tbody></table></div>`:""}
+    </div>`; };
+  return `<div class="panel" style="--mc:var(--c-${nat})"><div class="ghead"><h3>Acompanhamentos · só lembrete</h3><span class="note" style="margin:0">Fora do fluxo de caixa e da DRE</span></div><div class="cards">${cards.map(card).join("")}</div></div>`;
 }
 function tabelaEntries(L,nat){
   if (!L.length) return `<div class="tw"><div class="empty"><b>Nenhum lançamento aqui</b>${ui.todos?"":"Troque o mês, marque “Todos os meses” ou "}clique em “+ Nova conta a ${nat}”.</div></div>`;
@@ -951,7 +979,7 @@ function tabelaEntries(L,nat){
   return `<div class="tw"><table><thead><tr>${th("status","Status")}${th("venc","Vencimento")}${th("descricao","Descrição")}${th("origem","Origem")}${th("categoria","Categoria")}${th("classe","Tipo")}${th("valor","Valor","r")}<th class="r">Ações</th></tr></thead><tbody>
   ${L.map(e=>`<tr class="${e.pago?"is-pago":""}">
     <td>${pill(e)}</td><td class="num">${dt(e.venc)}</td>
-    <td class="desc">${esc(e.descricao)}${e.detalhe?`<small>${esc(e.detalhe)}</small>`:""}</td>
+    <td class="desc">${esc(e.descricao)}${e.fora?` <span class="tick more" title="Não entra no fluxo de caixa nem na DRE">Só lembrete</span>`:""}${e.detalhe?`<small>${esc(e.detalhe)}</small>`:""}</td>
     <td>${chipO(e.origem)}</td><td><span class="catname"><i style="background:${catColor(e.categoria)}"></i>${esc(e.categoria)}</span></td><td>${e.classe==="fixa"?"Fixa":"Variável"}</td>
     <td class="r num">${money(e.valor)}</td>
     <td><div class="acts">${e.fixoPago?`<span class="note">${nat==="pagar"?"Aporte":"Resgate"}</span>`:`<button class="pay ${e.pago?"done":""}" data-act="pago" data-key="${e.key}" title="${e.pago?"Desfazer":"Marcar"}">${e.pago?"✓ "+(nat==="pagar"?"Pago":"Recebido"):(nat==="pagar"?"Pagar":"Receber")}</button>`}
@@ -1324,6 +1352,7 @@ function fluxoDados(ini,n,modo){
   const months=[...Array(n)].map((_,i)=>shiftMonth(ini,i));
   const cats={receber:{},pagar:{}}; const tot=months.map(()=>({ent:0,sai:0}));
   for(const e of allEntries()){
+    if(e.fora) continue; /* só lembrete */
     const m = modo==="realizado" ? (e.pago ? (e.dataPag||e.venc).slice(0,7) : null) : e.venc.slice(0,7);
     const i = m ? months.indexOf(m) : -1; if(i<0) continue;
     const c = e.categoria||"Outros"; (cats[e.natureza][c] ||= months.map(()=>0))[i] += e.valor;
@@ -1356,7 +1385,7 @@ function fluxoChart(rows, lab=mesCurto, curKey=todayStr().slice(0,7)){
 function viewFluxoMes(){
   const mk = ui.fxIni, cur = todayStr(); const real = ui.fxModo==="realizado";
   const dataDe = e => real ? (e.pago ? (e.dataPag||e.venc) : null) : e.venc;
-  const L = allEntries().map(e=>({...e, d:dataDe(e)})).filter(e=>e.d && e.d.slice(0,7)===mk).sort((a,b)=>a.d.localeCompare(b.d)||(a.natureza==="receber"?-1:1));
+  const L = allEntries().filter(e=>!e.fora).map(e=>({...e, d:dataDe(e)})).filter(e=>e.d && e.d.slice(0,7)===mk).sort((a,b)=>a.d.localeCompare(b.d)||(a.natureza==="receber"?-1:1));
   const saldoIni = Number(fluxoCfg().saldos?.[mk])||0;
   const nd = new Date(+mk.slice(0,4), +mk.slice(5,7), 0).getDate(); let acc = saldoIni;
   const dias = [...Array(nd)].map((_,i)=>{ const d=`${mk}-${pad(i+1)}`; const it=L.filter(e=>e.d===d); const ent=r2(sum(it.filter(e=>e.natureza==="receber"),e=>e.valor)), sai=r2(sum(it.filter(e=>e.natureza==="pagar"),e=>e.valor)); const inicio=acc; acc=r2(acc+ent-sai); return {m:d,ent,sai,res:r2(ent-sai),inicio,fim:acc,it}; });
@@ -1647,6 +1676,7 @@ function formLanc(nat, id){
     <div class="fg">${fld("valor",r?"Valor (R$)":"Valor (R$)",moneyInp("valor",r?.valor))}${fld("vencimento",nat==="pagar"?(r?"Vencimento":"Vencimento (1º)"):(r?"Data prevista":"Data prevista (1ª)"),inp("vencimento",r?.vencimento||todayStr(),'type="date"'))}
       ${fld("forma","Forma",selInp("forma",r&&r.forma&&!FORMAS.includes(r.forma)?[r.forma,...formas]:formas,r?.forma||"Pix"))}</div>
     ${fld("obs","Observação",inp("obs",r?.obs,'autocomplete="off"'))}
+    <div class="escopo lembrete"><label class="chk" style="padding:0;color:var(--fg);font-weight:600"><input type="checkbox" name="foraFluxo" ${r?.foraFluxo?"checked":""}> Só lembrete — fora do fluxo de caixa e da DRE</label><span class="hint">Aparece aqui em contas a ${nat}, com aviso de vencimento e um card de acompanhamento (o que já foi ${nat==="pagar"?"pago":"recebido"} e o que falta), mas não entra no fluxo de caixa, na DRE nem nos números do Dashboard.</span></div>
     ${r?`<label class="chk"><input type="checkbox" name="pago" ${r.pago?"checked":""}> ${nat==="pagar"?"Já foi pago":"Já foi recebido"}</label>`:`<label class="chk"><input type="checkbox" name="pago"> ${nat==="pagar"?"O primeiro já foi pago":"O primeiro já foi recebido"}</label>`}
     ${r?"":`<div class="preview" id="pv"></div>`}`,
     onInput: fd => { if(r) return; condShow(fd);
@@ -1656,7 +1686,7 @@ function formLanc(nat, id){
       if(!req(fd,[["descricao","descrição"],["valor","valor"],["vencimento","vencimento"]])) return;
       const valor = r2(parseMoney(fd.get("valor"))); if(!(valor>0)){toast("Informe um valor maior que zero.");return;}
       const categoria = catValue(fd,"categoria",nat); if(categoria===null) return;
-      const base = {descricao:fd.get("descricao").trim(), parte:String(fd.get("parte")||"").trim(), categoria, forma:fd.get("forma"), classe:fd.get("classe")||"variavel", obs:fd.get("obs")||""};
+      const base = {descricao:fd.get("descricao").trim(), parte:String(fd.get("parte")||"").trim(), categoria, forma:fd.get("forma"), classe:fd.get("classe")||"variavel", obs:fd.get("obs")||"", foraFluxo:!!fd.get("foraFluxo")};
       if (r){
         const editado = r.editado || Math.abs(valor-r.valor)>0.004 || fd.get("vencimento")!==r.vencimento;
         Object.assign(r, base, {valor, vencimento:fd.get("vencimento"), pago:!!fd.get("pago"), editado: fd.get("escopo")==="proximos"?r.editado:editado}); r.dataPagamento = r.pago ? (r.dataPagamento||todayStr()) : null;
@@ -2288,7 +2318,7 @@ function reportSpec(){
   const aiTxt = sc => { const a=ai[sc]; if(!a||!a.turns.length) return; const l=a.turns[a.turns.length-1]; B.push({type:"text",title:"Análise do analista de IA",q:l.q,text:stripMd(l.a)}); };
   const entRow = e => [dt(e.venc), pdfTxt(e.descricao)+(e.detalhe?"\n"+pdfTxt(e.detalhe):""), ORIGENS[e.origem], pdfTxt(e.categoria), e.natureza==="pagar"?"Saída":"Entrada", money(e.valor), stLabel(e)];
   if (v==="painel"){
-    const P=E.filter(e=>inPer(e.venc)&&e.natureza==="pagar"), R=E.filter(e=>inPer(e.venc)&&e.natureza==="receber");
+    const P=E.filter(e=>!e.fora&&inPer(e.venc)&&e.natureza==="pagar"), R=E.filter(e=>!e.fora&&inPer(e.venc)&&e.natureza==="receber");
     const pT=sum(P,e=>e.valor), rT=sum(R,e=>e.valor), venc=E.filter(e=>!e.pago&&e.venc<t);
     kp([["A receber",money(rT),"--c-receber"],["A pagar",money(pT),"--c-pagar"],["Saldo previsto",money(rT-pT),rT-pT>=0?"--ok":"--bad"],["Vencidos a pagar",money(sum(venc.filter(e=>e.natureza==="pagar"),e=>e.valor)),"--bad"],
         ["Recebido",money(sum(R.filter(e=>e.pago),e=>e.valor)),"--ok"],["Pago",money(sum(P.filter(e=>e.pago),e=>e.valor)),"--ok"],["Despesas fixas",money(sum(P.filter(e=>e.classe==="fixa"),e=>e.valor)),"--c-pagar"],["Despesas variáveis",money(sum(P.filter(e=>e.classe!=="fixa"),e=>e.valor)),"--c-cartao"]]);
