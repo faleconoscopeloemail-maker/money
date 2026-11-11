@@ -15,8 +15,8 @@
 <meta name="copyright" content="© 2026 Yoshizane Gestão e Consultoria Ltda. Todos os direitos reservados.">
 <meta name="theme-color" content="#000000">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png?v=fx1">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=fx1">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -68,9 +68,9 @@ svg.ic{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-wid
 .num{font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:500}
 .app{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh}
 /* Sidebar */
-.side{background:var(--side);color:var(--side-fg);padding:22px 14px;display:flex;flex-direction:column;gap:20px;position:sticky;top:0;height:100vh;overflow:auto}
+.side{background:var(--side);color:var(--side-fg);padding:22px 14px;display:flex;flex-direction:column;gap:20px;position:sticky;top:0;height:100vh;overflow-y:auto;overflow-x:hidden}
 .brand{display:flex;align-items:center;gap:11px;padding:4px 8px 8px}
-.brand .lf{width:180px;height:auto;display:block}
+.brand .lf{width:170px;max-width:100%;height:auto;display:block}
 .brand .lm{display:none;width:34px;height:34px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .logo{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(140deg,#38b6ff,#0a7fc2);color:#fff;font-weight:800;font-size:18px;letter-spacing:-.04em;box-shadow:0 6px 18px -6px rgba(63,191,147,.6);flex:none}
@@ -789,7 +789,7 @@ function renderSide(){
       <button class="nav ${ui.view===k?"on":""}" data-act="view" data-v="${k}" style="--mc:var(${c})"><span class="ico">${icon(k)}</span>${l}${PROTEGIDAS.has(k)&&pinAtivo()&&!(ui.sec&&ui.view===k)?`<span class="lk-i" title="Protegido por senha">${icon("lock")}</span>`:""}${counts[k]?`<span class="cnt" title="vencidos">${counts[k]}</span>`:""}</button>`).join("")}</div>`).join("")}
     <div class="sidefoot">
       <div class="sync cloud"><i></i>Sincronizado${sessao?.user?.email?` · ${esc(sessao.user.email)}`:""}</div>
-      <small style="color:var(--side-muted);font-size:11px;padding:0 12px">Versão 23 · 11/11/2026</small>
+      <small style="color:var(--side-muted);font-size:11px;padding:0 12px">Versão 24 · 11/11/2026</small>
       <a class="btn sm ghost" href="manual.pdf" target="_blank" rel="noopener" style="text-decoration:none">📘 Manual de uso</a>
       <button class="btn sm ghost" data-act="backup-json">Baixar backup (JSON)</button>
       <button class="btn sm ghost" data-act="backup-csv">Exportar lançamentos (CSV)</button>
