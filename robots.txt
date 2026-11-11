@@ -1,4 +1,4 @@
-# Money · © 2026 Yoshizane Gestão e Consultoria Ltda. Todos os direitos reservados.
+# Fluxxu Pessoal · © 2026 Yoshizane Gestão e Consultoria Ltda. Todos os direitos reservados.
 # Uso por inteligência artificial (treino, cópia, resumo ou recriação) NÃO autorizado.
 User-agent: GPTBot
 Disallow: /
